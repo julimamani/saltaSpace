@@ -1,0 +1,201 @@
+<a routerLink="/lots" class="mb-4 inline-block text-sm font-medium text-emerald-700 hover:underline">← Volver al mercado</a>
+
+@if (loading() && !lot()) {
+  <div class="h-96 animate-pulse rounded-3xl bg-stone-200/70"></div>
+} @else if (error()) {
+  <div class="alert-error">{{ error() }}</div>
+} @else if (lot(); as l) {
+  <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-sm font-medium uppercase tracking-wide text-emerald-700">{{ l.crop }} · {{ l.hectares }} ha · Lote #{{ l.id }}</p>
+      <h1 class="text-3xl font-bold text-stone-900">{{ l.name }}</h1>
+      <p class="mt-1 text-sm text-stone-500">
+        Productor
+        @if (addressUrl(l.producer); as url) { <a class="font-mono text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">{{ short(l.producer) }}</a> }
+        @else { <span class="font-mono">{{ short(l.producer) }}</span> }
+        · Token
+        @if (addressUrl(l.token); as url) { <a class="font-mono text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">{{ short(l.token) }}</a> }
+        @else { <span class="font-mono">{{ short(l.token) }}</span> }
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <app-status-badge [lot]="l" [now]="now()" />
+      <button class="btn-ghost" (click)="refresh()">↻</button>
+    </div>
+  </header>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <div class="space-y-6 lg:col-span-2">
+      <app-lot-map [geometry]="l.geometry" height="20rem" />
+
+      <section class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="stat"><p class="stat-label">NDVI actual</p><p class="stat-value">{{ l.metrics ? l.metrics.ndvi.toFixed(3) : '—' }}</p></div>
+        <div class="stat"><p class="stat-label">Riesgo</p><p class="stat-value"><span class="rounded-lg px-2 text-lg" [class]="risk().cls">{{ risk().label }}</span></p></div>
+        <div class="stat"><p class="stat-label">Índice de rendimiento</p><p class="stat-value">{{ l.metrics ? l.metrics.yieldIndex.toFixed(3) : '—' }}</p></div>
+        <div class="stat">
+          <p class="stat-label">Pago estimado / token</p>
+          <p class="stat-value" [class.text-red-700]="l.preview.drought">{{ l.preview.payoutPerToken ? usd(l.preview.payoutPerToken) : '—' }}</p>
+          <p class="text-xs text-stone-500">{{ l.preview.multiplier ? l.preview.multiplier.toFixed(4) + '× capital' : 'sin métricas' }}{{ l.preview.drought ? ' · penalización sequía' : '' }}</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="card-title">Serie NDVI (Sentinel‑2)</h2>
+          @if (metrics()?.latest_analysis; as a) {
+            <span class="chip" [class.!bg-amber-100]="a.ndvi.source === 'mock'">
+              Fuente: {{ a.ndvi.source === 'mock' ? 'mock determinístico (fallback)' : 'Sentinel‑2 L2A real' }}{{ a.scenario !== 'real' ? ' · escenario ' + a.scenario : '' }}
+            </span>
+          }
+        </div>
+        @if (ndviChart().labels.length) {
+          <app-line-chart [labels]="ndviChart().labels" [series]="ndviChart().series" [yMin]="0" [yMax]="1" />
+        } @else {
+          <p class="py-8 text-center text-sm text-stone-500">{{ metricsError() ?? 'El oráculo todavía no analizó este lote.' }}</p>
+        }
+      </section>
+
+      <section class="card">
+        <h2 class="card-title mb-3">Evolución del pago estimado</h2>
+        @if (payoutChart().labels.length) {
+          <app-line-chart [labels]="payoutChart().labels" [series]="payoutChart().series" height="14rem" />
+          @if (params(); as p) {
+            <p class="mt-2 text-xs text-stone-500">
+              pago = precio × clamp(1 + APY {{ pct(l.targetApy) }} × yieldIndex − {{ pct(p.droughtHaircut) }} si NDVI &lt; {{ p.criticalNdvi }}, {{ p.minPayout }}, {{ p.maxPayout }})
+            </p>
+          }
+        } @else {
+          <p class="py-6 text-center text-sm text-stone-500">Sin actualizaciones del oráculo todavía.</p>
+        }
+      </section>
+
+      <section class="card">
+        <h2 class="card-title mb-3">Clima del período (Open‑Meteo + NASA POWER)</h2>
+        @if (metrics()?.latest_analysis?.weather; as w) {
+          <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="mini"><p>Lluvia acumulada</p><b>{{ w.rain_mm.toFixed(0) }} mm</b></div>
+            <div class="mini"><p>Evapotranspiración</p><b>{{ w.et0_mm.toFixed(0) }} mm</b></div>
+            <div class="mini"><p>Déficit hídrico</p><b [class.text-red-700]="w.water_deficit_mm > 100">{{ w.water_deficit_mm.toFixed(0) }} mm</b></div>
+            <div class="mini"><p>Temp. media</p><b>{{ w.temp_mean_c?.toFixed(1) ?? '—' }} °C</b></div>
+            <div class="mini"><p>Días de estrés térmico</p><b>{{ w.heat_stress_days }}</b></div>
+            <div class="mini"><p>Radiación (NASA)</p><b>{{ w.solar_radiation_kwh_m2_day?.toFixed(1) ?? '—' }} kWh/m²</b></div>
+            <div class="mini"><p>Lluvia NASA POWER</p><b>{{ w.nasa_rain_mm?.toFixed(0) ?? '—' }} mm</b></div>
+            <div class="mini"><p>Pronóstico 7 días</p><b>{{ w.forecast_rain_7d_mm?.toFixed(0) ?? '—' }} mm</b></div>
+          </div>
+          @if (rainChart().labels.length) {
+            <app-line-chart [labels]="rainChart().labels" [series]="rainChart().series" height="12rem" />
+          }
+          <p class="mt-2 text-xs text-stone-500">{{ w.start_date }} → {{ w.end_date }} · fuentes: {{ w.sources.join(', ') || '—' }}</p>
+        } @else {
+          <p class="py-6 text-center text-sm text-stone-500">{{ metricsError() ?? 'Sin datos climáticos todavía.' }}</p>
+        }
+      </section>
+
+      <section class="card">
+        <h2 class="card-title mb-3">Eventos on-chain</h2>
+        @if (eventsError()) { <p class="text-sm text-red-600">{{ eventsError() }}</p> }
+        <ul class="divide-y divide-stone-100">
+          @for (e of events(); track e.txHash + e.name + $index) {
+            <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+              <div class="min-w-0">
+                <p class="font-medium text-stone-800">{{ eventLabel(e) }}</p>
+                <p class="text-stone-500">{{ eventDetail(e) }}</p>
+              </div>
+              <div class="text-right text-xs text-stone-400">
+                <p>{{ dateTime(e.timestamp) }}</p>
+                @if (txUrl(e.txHash); as url) { <a class="text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">Snowtrace ↗</a> }
+                @else { <span class="font-mono">bloque {{ e.blockNumber }}</span> }
+              </div>
+            </li>
+          } @empty {
+            <li class="py-4 text-center text-sm text-stone-500">Sin eventos.</li>
+          }
+        </ul>
+      </section>
+    </div>
+
+    <aside class="space-y-6">
+      <section class="card">
+        <h2 class="card-title mb-3">Campaña</h2>
+        <div class="mb-1 flex justify-between text-sm"><span class="text-stone-500">Recaudado</span><b>{{ usd(l.raised, 0) }} / {{ usd(l.fundingGoal, 0) }} USDC</b></div>
+        <div class="mb-3 h-2.5 overflow-hidden rounded-full bg-stone-100">
+          <div class="h-full rounded-full bg-gradient-to-r from-lime-500 to-emerald-600" [style.width.%]="l.progress * 100"></div>
+        </div>
+        <dl class="grid grid-cols-2 gap-y-2 text-sm">
+          <dt class="text-stone-500">Precio token</dt><dd class="text-right font-medium">{{ usd(l.pricePerToken) }} USDC</dd>
+          <dt class="text-stone-500">Tokens vendidos</dt><dd class="text-right font-medium">{{ l.tokensSold }} / {{ l.maxTokens }}</dd>
+          <dt class="text-stone-500">APY objetivo</dt><dd class="text-right font-medium">{{ pct(l.targetApy) }}</dd>
+          <dt class="text-stone-500">Cierre</dt><dd class="text-right font-medium">{{ dateTime(l.fundingDeadline) }}</dd>
+          <dt class="text-stone-500">Cosecha (madurez)</dt><dd class="text-right font-medium">{{ dateTime(l.maturity) }}</dd>
+          <dt class="text-stone-500">Repago depositado</dt><dd class="text-right font-medium">{{ usd(l.repaid) }} USDC</dd>
+        </dl>
+        @if (l.status === 'Funding' && now() <= l.fundingDeadline) {
+          <p class="mt-3 text-xs text-stone-500">Cierra en {{ duration(l.fundingDeadline - now()) }}.</p>
+        } @else if (l.status === 'Funded' && now() < l.maturity) {
+          <p class="mt-3 text-xs text-stone-500">Cosecha en {{ duration(l.maturity - now()) }}.</p>
+        }
+      </section>
+
+      <section class="card">
+        <h2 class="card-title mb-3">Tu posición</h2>
+        @if (!wallet.ready()) {
+          <p class="text-sm text-stone-500">Conectá tu wallet en {{ wallet.chain.name }} para invertir o cobrar.</p>
+        } @else {
+          <div class="mb-4 grid grid-cols-2 gap-2">
+            <div class="mini"><p>Tus tokens</p><b>{{ position()?.tokens ?? 0 }}</b></div>
+            <div class="mini"><p>{{ l.status === 'Settled' ? 'A cobrar' : 'Valor estimado' }}</p><b>{{ usd(positionValue()) }} USDC</b></div>
+          </div>
+
+          @if (canInvest()) {
+            <label class="label" for="tokens">Cantidad de tokens (disponibles: {{ available() }})</label>
+            <div class="mb-2 flex gap-2">
+              <input id="tokens" type="number" min="1" [max]="available()" class="input" [ngModel]="tokensToBuy()" (ngModelChange)="setTokens($event)" />
+              <button class="btn-ghost" (click)="setTokens(available())">Máx</button>
+            </div>
+            <p class="mb-3 text-sm text-stone-600">Costo: <b>{{ usd(cost()) }} USDC</b> · Saldo: {{ usd(wallet.usdcBalance()) }}</p>
+            <button class="btn-primary w-full" (click)="invest()" [disabled]="!!busy()">
+              {{ busy() === 'invest' ? 'Procesando…' : 'Aprobar e invertir' }}
+            </button>
+            @if ((wallet.usdcBalance() ?? 0) < cost()) {
+              <p class="mt-2 text-xs text-amber-700">Saldo insuficiente: usá el faucet de USDC desde el botón de tu wallet.</p>
+            }
+          }
+          @if (l.status === 'Settled' && (position()?.tokens ?? 0) > 0) {
+            <button class="btn-primary w-full" (click)="claim()" [disabled]="!!busy()">{{ busy() === 'claim' ? 'Cobrando…' : 'Cobrar ' + usd(positionValue()) + ' USDC' }}</button>
+          }
+          @if (canRefund() && (position()?.tokens ?? 0) > 0) {
+            <button class="btn-warn w-full" (click)="refund()" [disabled]="!!busy()">{{ busy() === 'refund' ? 'Procesando…' : 'Pedir reembolso' }}</button>
+          }
+        }
+      </section>
+
+      @if (l.status === 'Funded') {
+        <section class="card border-amber-200 bg-amber-50/40">
+          <h2 class="card-title mb-1">Productor / liquidación</h2>
+          <p class="mb-3 text-xs text-stone-500">
+            {{ isProducer() ? 'Sos el productor de este lote.' : 'Cualquiera puede depositar repago; liquidar requiere madurez o rol SETTLER (demo).' }}
+          </p>
+          <div class="space-y-2">
+            @if (!l.fundsReleased) {
+              <button class="btn-ghost w-full" (click)="release()" [disabled]="!!busy() || !wallet.ready()">{{ busy() === 'release' ? 'Liberando…' : 'Liberar ' + usd(l.raised, 0) + ' USDC al productor' }}</button>
+            }
+            @if (l.requiredRepayment > 0) {
+              <button class="btn-ghost w-full" (click)="repay()" [disabled]="!!busy() || !wallet.ready()">{{ busy() === 'repay' ? 'Depositando…' : 'Depositar repago ' + usd(l.requiredRepayment) + ' USDC' }}</button>
+            }
+            <button class="btn-primary w-full" (click)="settle()" [disabled]="!!busy() || !wallet.ready() || !l.metrics">{{ busy() === 'settle' ? 'Liquidando…' : 'Liquidar con datos del oráculo' }}</button>
+          </div>
+        </section>
+      }
+
+      <section class="card">
+        <h2 class="card-title mb-2">Oráculo</h2>
+        <p class="mb-3 text-xs text-stone-500">Última publicación: {{ l.metrics ? dateTime(l.metrics.timestamp) : 'nunca' }}</p>
+        @if (l.metrics) { <p class="mb-3 break-all font-mono text-[10px] text-stone-400">dataHash {{ l.metrics.dataHash }}</p> }
+        <button class="btn-ghost w-full" (click)="pushOracle()" [disabled]="!!busy()">{{ busy() === 'oracle' ? 'Analizando satélite…' : 'Actualizar con datos reales' }}</button>
+        <a routerLink="/demo" [queryParams]="{ lot: l.id }" class="mt-2 block text-center text-xs font-semibold text-emerald-700 hover:underline">Panel demo (sequía / cosecha excelente) →</a>
+      </section>
+
+      @if (actionError()) { <div class="alert-error">{{ actionError() }}</div> }
+    </aside>
+  </div>
+}

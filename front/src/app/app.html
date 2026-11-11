@@ -1,0 +1,44 @@
+<div class="disclaimer" role="note">
+  <strong>Prototipo educativo / testnet</strong> — Activos agrícolas simulados en {{ chainName }}. Sin valor real; no constituye oferta pública ni tokenización legal.
+</div>
+
+<header class="sticky top-0 z-[1200] border-b border-stone-200/80 bg-white/90 backdrop-blur">
+  <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+    <a routerLink="/" class="flex items-center gap-2">
+      <span class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-lime-500 to-emerald-700 text-lg text-white">🌾</span>
+      <span class="text-xl font-extrabold tracking-tight text-emerald-900">Agro<span class="text-lime-600">Token</span></span>
+    </a>
+    <nav class="hidden items-center gap-1 md:flex">
+      @for (l of links; track l.path) {
+        <a [routerLink]="l.path" routerLinkActive="nav-active" [routerLinkActiveOptions]="{ exact: l.exact }" class="nav-link">{{ l.label }}</a>
+      }
+    </nav>
+    <div class="flex items-center gap-2">
+      <app-wallet-button />
+      <button class="rounded-lg p-2 text-stone-600 md:hidden" (click)="menuOpen.set(!menuOpen())" aria-label="Menú">☰</button>
+    </div>
+  </div>
+  @if (menuOpen()) {
+    <nav class="flex flex-col border-t border-stone-100 px-4 py-2 md:hidden">
+      @for (l of links; track l.path) {
+        <a [routerLink]="l.path" routerLinkActive="nav-active" [routerLinkActiveOptions]="{ exact: l.exact }" class="nav-link" (click)="menuOpen.set(false)">{{ l.label }}</a>
+      }
+    </nav>
+  }
+</header>
+
+<main class="mx-auto max-w-7xl px-4 py-8">
+  @if (!deployed) {
+    <div class="alert-error mb-6">No hay contratos desplegados para {{ chainName }}. Corré <code>npm run deploy:local</code> o <code>deploy:fuji</code> en <code>contracts/</code>.</div>
+  }
+  <router-outlet />
+</main>
+
+<footer class="border-t border-stone-200 bg-white/60">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-stone-500">
+    <p>AgroToken · Hackathon prototype · Avalanche Fuji · Datos: Sentinel‑2 (Earth Search), Open‑Meteo, NASA POWER.</p>
+    <p class="font-semibold text-amber-700">Prototipo educativo / testnet — no es asesoramiento financiero.</p>
+  </div>
+</footer>
+
+<app-tx-toasts />

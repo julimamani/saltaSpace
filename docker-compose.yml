@@ -1,0 +1,53 @@
+# One-command local demo: Hardhat node + deploy/seed + FastAPI oracle + Angular SSR.
+#   docker compose up --build
+# Front: http://localhost:4000 · API: http://localhost:8000/docs · RPC: http://localhost:8545 (chainId 31337)
+services:
+  hardhat:
+    build: ./contracts
+    ports: ["8545:8545"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8545',{method:'POST',headers:{'content-type':'application/json'},body:'{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_chainId\"}'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      retries: 20
+
+  deployer:
+    build: ./contracts
+    depends_on:
+      hardhat: { condition: service_healthy }
+    environment:
+      LOCAL_RPC_URL: http://hardhat:8545
+    # Addresses on a fresh Hardhat node are deterministic, so the exported files match the committed ones.
+    volumes:
+      - ./backend/app/chain:/repo/backend/app/chain
+      - ./front/src/app/web3/generated:/repo/front/src/app/web3/generated
+    command: sh -c "npx hardhat run scripts/deploy.ts --network localhost && npx hardhat run scripts/seed-demo.ts --network localhost"
+    restart: "no"
+
+  backend:
+    build: ./backend
+    depends_on:
+      deployer: { condition: service_completed_successfully }
+    ports: ["8000:8000"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      RPC_URL: http://hardhat:8545
+      CHAIN_NETWORK: localhost
+      # Hardhat account #0 — a PUBLICLY KNOWN dev key, only valid on the local node. Never use it on a real network.
+      ORACLE_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      ENABLE_SCHEDULER: "true"
+      ORACLE_INTERVAL_MINUTES: "30"
+      CORS_ORIGINS: http://localhost:4000,http://localhost:4200,http://127.0.0.1:4000
+      DATABASE_PATH: /data/agrotoken.db
+    volumes:
+      - ./backend/app/chain:/app/app/chain:ro
+      - backend-data:/data
+
+  front:
+    build: ./front
+    depends_on: [backend]
+    ports: ["4000:4000"]
+
+volumes:
+  backend-data:

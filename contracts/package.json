@@ -1,0 +1,29 @@
+{
+  "name": "agrotoken-contracts",
+  "version": "1.0.0",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "node": "hardhat node",
+    "export-abis": "hardhat compile && ts-node scripts/export-abis.ts",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:fuji": "hardhat run scripts/deploy.ts --network fuji",
+    "seed:local": "hardhat run scripts/seed-demo.ts --network localhost",
+    "seed:fuji": "hardhat run scripts/seed-demo.ts --network fuji"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "AgroToken smart contracts (Avalanche Fuji)",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.6.1",
+    "@types/node": "^26.6.6",
+    "dotenv": "^18.0.10",
+    "hardhat": "^2.29.2",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8"
+  },
+  "private": true
+}

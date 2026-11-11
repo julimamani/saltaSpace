@@ -1,0 +1,123 @@
+import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { LotsService } from '../core/lots.service';
+import { ApiService } from '../core/api.service';
+import { WalletService } from '../core/wallet.service';
+import { errorMessage } from '../core/errors';
+import type { HealthResponse, LotView } from '../core/models';
+import { pct, usd } from '../core/format';
+import { LotCard } from '../shared/lot-card';
+
+@Component({
+  selector: 'app-dashboard',
+  imports: [RouterLink, LotCard],
+  template: `
+    <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-700 px-6 py-12 text-white sm:px-10">
+      <div class="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-lime-400/20 blur-3xl"></div>
+      <p class="mb-3 inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider">Avalanche · RWA agro simulado</p>
+      <h1 class="max-w-2xl text-3xl font-bold leading-tight sm:text-5xl">Financiá cosechas del norte argentino con datos satelitales reales</h1>
+      <p class="mt-4 max-w-2xl text-emerald-50/90">
+        Productores de Salta, Jujuy y Tucumán tokenizan un lote antes de sembrar. Inversores compran fracciones con USDC de prueba
+        y, al cosechar, un contrato inteligente liquida el pago según el NDVI de Sentinel‑2 y el clima de Open‑Meteo / NASA POWER.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a routerLink="/lots" class="rounded-xl bg-white px-5 py-3 font-semibold text-emerald-900 shadow hover:bg-lime-50">Ver lotes para invertir</a>
+        <a routerLink="/producer" class="rounded-xl border border-white/40 px-5 py-3 font-semibold hover:bg-white/10">Soy productor: registrar lote</a>
+      </div>
+    </section>
+
+    <section class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="stat"><p class="stat-label">Total financiado</p><p class="stat-value">{{ usd(totalRaised(), 0) }} <span class="text-base font-medium text-stone-500">USDC</span></p></div>
+      <div class="stat"><p class="stat-label">Lotes activos</p><p class="stat-value">{{ activeCount() }} <span class="text-base font-medium text-stone-500">/ {{ lots().length }}</span></p></div>
+      <div class="stat"><p class="stat-label">Retorno estimado promedio</p><p class="stat-value text-emerald-700">{{ pct(avgReturn()) }}</p></div>
+      <div class="stat"><p class="stat-label">Hectáreas tokenizadas</p><p class="stat-value">{{ totalHa().toLocaleString('es-AR') }} <span class="text-base font-medium text-stone-500">ha</span></p></div>
+    </section>
+
+    <section class="mt-4 flex flex-wrap gap-2 text-xs">
+      <span class="chip">Red: {{ wallet.chain.name }}</span>
+      @if (health(); as h) {
+        <span class="chip" [class.!bg-emerald-100]="h.chain.connected">Backend/oráculo: {{ h.chain.connected ? 'conectado' : 'sin cadena' }}</span>
+        @if (h.simulate_drought) { <span class="chip !bg-amber-100">SIMULATE_DROUGHT activo</span> }
+      } @else if (healthError()) {
+        <span class="chip !bg-red-100">Backend no disponible</span>
+      }
+    </section>
+
+    <section class="mt-10">
+      <div class="mb-4 flex items-end justify-between">
+        <h2 class="text-2xl font-bold text-stone-900">Lotes destacados</h2>
+        <a routerLink="/lots" class="text-sm font-semibold text-emerald-700 hover:underline">Ver todos →</a>
+      </div>
+      @if (loading()) {
+        <div class="grid gap-4 md:grid-cols-3">@for (i of [1, 2, 3]; track i) { <div class="h-52 animate-pulse rounded-2xl bg-stone-200/70"></div> }</div>
+      } @else if (error()) {
+        <div class="alert-error">{{ error() }}</div>
+      } @else if (!lots().length) {
+        <div class="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500">
+          Todavía no hay lotes. <a routerLink="/producer" class="font-semibold text-emerald-700 underline">Registrá el primero</a>.
+        </div>
+      } @else {
+        <div class="grid gap-4 md:grid-cols-3">
+          @for (l of lots().slice(0, 3); track l.id) { <app-lot-card [lot]="l" [now]="lotsSvc.chainNow()" /> }
+        </div>
+      }
+    </section>
+
+    <section class="mt-12">
+      <h2 class="mb-4 text-2xl font-bold text-stone-900">Cómo funciona</h2>
+      <ol class="grid gap-4 md:grid-cols-4">
+        @for (s of steps; track s.t; let i = $index) {
+          <li class="rounded-2xl border border-stone-200 bg-white p-5">
+            <span class="mb-2 grid h-8 w-8 place-items-center rounded-full bg-lime-100 font-bold text-emerald-800">{{ i + 1 }}</span>
+            <p class="font-semibold">{{ s.t }}</p>
+            <p class="mt-1 text-sm text-stone-600">{{ s.d }}</p>
+          </li>
+        }
+      </ol>
+    </section>
+  `,
+})
+export class Dashboard {
+  protected readonly lotsSvc = inject(LotsService);
+  protected readonly wallet = inject(WalletService);
+  private readonly api = inject(ApiService);
+  protected readonly lots = signal<LotView[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly error = signal<string | null>(null);
+  protected readonly health = signal<HealthResponse | null>(null);
+  protected readonly healthError = signal(false);
+  protected readonly usd = usd;
+  protected readonly pct = pct;
+
+  protected readonly totalRaised = computed(() => this.lots().reduce((a, l) => a + l.raised, 0));
+  protected readonly totalHa = computed(() => this.lots().reduce((a, l) => a + l.hectares, 0));
+  protected readonly activeCount = computed(() => this.lots().filter((l) => l.status === 'Funding' || l.status === 'Funded').length);
+  protected readonly avgReturn = computed(() => {
+    const l = this.lots();
+    return l.length ? l.reduce((a, x) => a + x.estimatedReturn, 0) / l.length : null;
+  });
+
+  protected readonly steps = [
+    { t: 'Registro del lote', d: 'El productor dibuja el polígono; el backend analiza NDVI y clima reales y crea el lote on-chain.' },
+    { t: 'Inversión fraccionada', d: 'Los inversores compran tokens ERC‑20 del lote con USDC de prueba.' },
+    { t: 'Financiamiento', d: 'Al alcanzar la meta, el productor recibe el capital antes de la siembra.' },
+    { t: 'Liquidación por datos', d: 'El oráculo publica NDVI, riesgo e índice de rendimiento; el contrato calcula el pago.' },
+  ];
+
+  constructor() {
+    afterNextRender(() => {
+      void this.load();
+      this.api.health().then((h) => this.health.set(h), () => this.healthError.set(true));
+    });
+  }
+
+  private async load(): Promise<void> {
+    try {
+      this.lots.set(await this.lotsSvc.loadAll());
+    } catch (e) {
+      this.error.set(errorMessage(e));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+}
