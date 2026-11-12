@@ -91,6 +91,8 @@ class Chain:
         state = self.vault.functions.getLotState(lot_id).call()
         m = self.oracle.functions.latestMetrics(lot_id).call()
         preview = self.vault.functions.previewPayout(lot_id).call()
+        ins = self.vault.functions.getLotInsurance(lot_id).call()
+        trig = self.vault.functions.insuranceTrigger(lot_id).call()
         return {
             "id": lot_id,
             "producer": lot[0],
@@ -111,10 +113,32 @@ class Chain:
             "raised": state[3] / 1e6,
             "repaid": state[4] / 1e6,
             "payout_per_token": state[5] / 1e6,
-            "metrics": None
-            if m[3] == 0
-            else {"ndvi": m[0] / 10_000, "risk_score": m[1], "yield_index": m[2] / 10_000, "timestamp": m[3], "data_hash": "0x" + m[4].hex()},
+            "metrics": None if m[9] == 0 else self._metrics(m),
             "preview": {"multiplier": preview[0] / 10_000, "payout_per_token": preview[1] / 1e6, "drought": preview[2]},
+            "insurance": {
+                "premium": ins[0] / 1e6,
+                "coverage": ins[1] / 1e6,
+                "executed": ins[2],
+                "triggered": trig[0],
+                "coverage_available": trig[2] / 1e6,
+                "pool": self.vault.functions.insurancePool().call() / 1e6,
+            },
+        }
+
+    @staticmethod
+    def _metrics(m: tuple) -> dict[str, Any]:
+        return {
+            "ndvi": m[0] / 10_000,
+            "ndwi": m[1] / 10_000,
+            "risk_score": m[2],
+            "yield_index": m[3] / 10_000,
+            "water_balance_mm": m[4],
+            "critical_dry_days": m[5],
+            "rain_vs_normal": m[6] / 10_000,
+            "ndvi_drop": m[7] / 10_000,
+            "soil_dry_days": m[8],
+            "timestamp": m[9],
+            "data_hash": "0x" + m[10].hex(),
         }
 
     def list_lots(self) -> list[dict[str, Any]]:
@@ -122,18 +146,43 @@ class Chain:
 
     # ----------------------------------------------------------------- writes
 
-    def push_metrics(self, lot_id: int, ndvi: float, risk_score: int, yield_index: float, data_hash: str) -> dict[str, Any]:
-        """Signs and sends OracleConsumer.updateLotMetrics with the oracle key."""
+    def push_metrics(
+        self,
+        lot_id: int,
+        *,
+        ndvi: float,
+        ndwi: float | None,
+        risk_score: int,
+        yield_index: float,
+        water_balance_mm: float,
+        critical_dry_days: int,
+        rain_vs_normal: float | None,
+        ndvi_drop: float,
+        soil_dry_days: int,
+        data_hash: str,
+    ) -> dict[str, Any]:
+        """Signs and sends OracleConsumer.updateLotMetrics(lotId, Metrics) with the oracle key."""
         acct = self.account
-        ndvi_i = max(-10_000, min(10_000, round(ndvi * 10_000)))
-        yield_bps = max(5_000, min(13_000, round(yield_index * 10_000)))
-        risk = max(0, min(100, int(risk_score)))
+        clamp = lambda v, lo, hi: max(lo, min(hi, v))  # noqa: E731
         with self._lock:
-            last_ts = self.oracle.functions.latestMetrics(lot_id).call()[3]
+            last_ts = self.oracle.functions.latestMetrics(lot_id).call()[9]
             # Must be strictly increasing on-chain and not ahead of block time (+15 min drift).
             block_ts = self.w3.eth.get_block("latest")["timestamp"]
             ts = max(min(int(time.time()), block_ts + 600), last_ts + 1)
-            fn = self.oracle.functions.updateLotMetrics(lot_id, ndvi_i, risk, yield_bps, ts, bytes.fromhex(data_hash[2:]))
+            metrics = (
+                clamp(round(ndvi * 10_000), -10_000, 10_000),
+                clamp(round((ndwi if ndwi is not None else 0.0) * 10_000), -10_000, 10_000),
+                clamp(int(risk_score), 0, 100),
+                clamp(round(yield_index * 10_000), 5_000, 13_000),
+                clamp(round(water_balance_mm), -2_000_000_000, 2_000_000_000),
+                clamp(int(critical_dry_days), 0, 65_535),
+                clamp(round((rain_vs_normal if rain_vs_normal is not None else 1.0) * 10_000), 0, 65_535),
+                clamp(round(ndvi_drop * 10_000), 0, 10_000),
+                clamp(int(soil_dry_days), 0, 65_535),
+                ts,
+                bytes.fromhex(data_hash[2:]),
+            )
+            fn = self.oracle.functions.updateLotMetrics(lot_id, metrics)
             tx = fn.build_transaction(
                 {"from": acct.address, "nonce": self.w3.eth.get_transaction_count(acct.address, "pending"), "chainId": self.w3.eth.chain_id}
             )

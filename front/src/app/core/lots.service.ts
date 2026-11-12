@@ -3,7 +3,7 @@ import { formatUnits, type Address, type Log } from 'viem';
 import { USDC_DECIMALS } from './config';
 import { WalletService } from './wallet.service';
 import { CampaignVaultAbi, LotFactoryAbi, LotTokenAbi, OracleConsumerAbi, MockUSDCAbi } from '../web3/generated/abis';
-import { STATUS_NAMES, type LotEvent, type LotView, type PayoutParams, type PolygonGeometry } from './models';
+import { STATUS_NAMES, type InsuranceParams, type LotEvent, type LotView, type PayoutParams, type PolygonGeometry } from './models';
 
 const usdc = (v: bigint) => Number(formatUnits(v, USDC_DECIMALS));
 const LOG_CHUNK = 2_000n;
@@ -45,12 +45,14 @@ export class LotsService {
   async load(id: number): Promise<LotView> {
     const lotId = BigInt(id);
     const c = this.c;
-    const [lot, state, metrics, preview, required] = await Promise.all([
+    const [lot, state, metrics, preview, required, ins, trigger] = await Promise.all([
       this.client.readContract({ address: c.LotFactory, abi: LotFactoryAbi, functionName: 'getLot', args: [lotId] }),
       this.client.readContract({ address: c.CampaignVault, abi: CampaignVaultAbi, functionName: 'getLotState', args: [lotId] }),
       this.client.readContract({ address: c.OracleConsumer, abi: OracleConsumerAbi, functionName: 'latestMetrics', args: [lotId] }),
       this.client.readContract({ address: c.CampaignVault, abi: CampaignVaultAbi, functionName: 'previewPayout', args: [lotId] }),
       this.client.readContract({ address: c.CampaignVault, abi: CampaignVaultAbi, functionName: 'requiredRepayment', args: [lotId] }),
+      this.client.readContract({ address: c.CampaignVault, abi: CampaignVaultAbi, functionName: 'getLotInsurance', args: [lotId] }),
+      this.client.readContract({ address: c.CampaignVault, abi: CampaignVaultAbi, functionName: 'insuranceTrigger', args: [lotId] }),
     ]);
     let geometry: PolygonGeometry | null = null;
     try {
@@ -87,13 +89,26 @@ export class LotsService {
       metrics: hasMetrics
         ? {
             ndvi: metrics.ndvi / 10_000,
+            ndwi: metrics.ndwi / 10_000,
             riskScore: metrics.riskScore,
             yieldIndex: metrics.yieldIndexBps / 10_000,
+            waterBalanceMm: metrics.waterBalanceMm,
+            criticalDryDays: metrics.criticalDryDays,
+            rainVsNormal: metrics.rainVsNormalBps / 10_000,
+            ndviDrop: metrics.ndviDropBps / 10_000,
+            soilDryDays: metrics.soilDryDays,
             timestamp: Number(metrics.timestamp),
             dataHash: metrics.dataHash,
           }
         : null,
       preview: { multiplier, payoutPerToken: usdc(preview[1]), drought: preview[2] },
+      insurance: {
+        premium: usdc(ins.premium),
+        coverage: usdc(ins.coverage),
+        executed: ins.executed,
+        triggered: trigger[0],
+        coverageAvailable: usdc(trigger[2]),
+      },
       requiredRepayment: usdc(required),
       progress: fundingGoal > 0 ? usdc(state.raised) / fundingGoal : 0,
       estimatedReturn: multiplier > 0 ? multiplier - 1 : lot.targetApyBps / 10_000,
@@ -101,12 +116,33 @@ export class LotsService {
   }
 
   async payoutParams(): Promise<PayoutParams> {
-    const [criticalNdvi, haircut, min, max] = await this.client.readContract({
+    const [criticalNdvi, criticalDryDays, haircut, min, max] = await this.client.readContract({
       address: this.c.CampaignVault,
       abi: CampaignVaultAbi,
       functionName: 'payoutParams',
     });
-    return { criticalNdvi: criticalNdvi / 10_000, droughtHaircut: haircut / 10_000, minPayout: min / 10_000, maxPayout: max / 10_000 };
+    return { criticalNdvi: criticalNdvi / 10_000, criticalDryDays, droughtHaircut: haircut / 10_000, minPayout: min / 10_000, maxPayout: max / 10_000 };
+  }
+
+  async insuranceParams(): Promise<InsuranceParams> {
+    const [premium, coverage, rain, ndwi, dryDays, ndviDrop, soilDry] = await this.client.readContract({
+      address: this.c.CampaignVault,
+      abi: CampaignVaultAbi,
+      functionName: 'insuranceParams',
+    });
+    return {
+      premium: premium / 10_000,
+      coverage: coverage / 10_000,
+      rainTrigger: rain / 10_000,
+      ndwiTrigger: ndwi / 10_000,
+      dryDaysTrigger: dryDays,
+      ndviDropTrigger: ndviDrop / 10_000,
+      soilDryDaysTrigger: soilDry,
+    };
+  }
+
+  async insurancePool(): Promise<number> {
+    return usdc(await this.client.readContract({ address: this.c.CampaignVault, abi: CampaignVaultAbi, functionName: 'insurancePool' }));
   }
 
   async position(lot: LotView, account: Address): Promise<{ tokens: number; usdcAllowance: number }> {

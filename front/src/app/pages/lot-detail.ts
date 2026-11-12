@@ -1,4 +1,5 @@
 import { Component, OnDestroy, afterNextRender, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { KeyValuePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { parseUnits } from 'viem';
@@ -7,7 +8,7 @@ import { WalletService } from '../core/wallet.service';
 import { ApiService, apiError } from '../core/api.service';
 import { errorMessage } from '../core/errors';
 import { USDC_DECIMALS, addressUrl, txUrl } from '../core/config';
-import type { LotEvent, LotMetricsResponse, LotView, PayoutParams } from '../core/models';
+import type { InsuranceParams, LotEvent, LotMetricsResponse, LotView, PayoutParams } from '../core/models';
 import { dateTime, duration, pct, riskLabel, shortAddr, shortDate, usd } from '../core/format';
 import { LotMap } from '../shared/lot-map';
 import { LineChart, type ChartSeries } from '../shared/line-chart';
@@ -26,11 +27,36 @@ const EVENT_LABEL: Record<string, string> = {
   SurplusReturned: 'Excedente devuelto',
   Claimed: 'Cobro',
   MetricsUpdated: 'Oráculo: métricas',
+  InsurancePremiumCollected: 'Seguro: prima al pool',
+  InsurancePoolFunded: 'Seguro: aporte al pool',
+  InsuranceExecuted: 'Seguro paramétrico ejecutado',
+};
+
+const CONDITION_LABEL: Record<string, string> = {
+    precipitacion_menor_etc: 'Lluvia < ETc (Penman‑Monteith × Kc)',
+    ndwi_bajo_umbral: 'NDWI bajo el umbral (agua en hoja)',
+    lluvia_bajo_50pct_historico: 'Lluvia < 50% del histórico',
+    dias_criticos_floracion: 'Días críticos secos en floración',
+    caida_drastica_ndvi: 'Caída drástica del NDVI',
+    suelo_seco_prolongado_sar: 'Suelo seco prolongado (Sentinel‑1)',
+};
+
+type OnchainMetricsArgs = {
+  ndvi: number;
+  ndwi: number;
+  riskScore: number;
+  yieldIndexBps: number;
+  waterBalanceMm: number;
+  criticalDryDays: number;
+  rainVsNormalBps: number;
+  ndviDropBps: number;
+  soilDryDays: number;
+  timestamp: bigint;
 };
 
 @Component({
   selector: 'app-lot-detail',
-  imports: [FormsModule, RouterLink, LotMap, LineChart, StatusBadge],
+  imports: [FormsModule, KeyValuePipe, RouterLink, LotMap, LineChart, StatusBadge],
   templateUrl: './lot-detail.html',
 })
 export class LotDetail implements OnDestroy {
@@ -48,6 +74,9 @@ export class LotDetail implements OnDestroy {
   protected readonly events = signal<LotEvent[]>([]);
   protected readonly eventsError = signal<string | null>(null);
   protected readonly params = signal<PayoutParams | null>(null);
+  protected readonly insParams = signal<InsuranceParams | null>(null);
+  protected readonly pool = signal<number | null>(null);
+  protected readonly poolAmount = signal(100);
   protected readonly position = signal<{ tokens: number; usdcAllowance: number } | null>(null);
   protected readonly busy = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
@@ -90,6 +119,57 @@ export class LotDetail implements OnDestroy {
     return p.tokens * perToken;
   });
 
+  protected readonly analysis = computed(() => this.metrics()?.latest_analysis ?? null);
+  protected readonly insurance = computed(() => this.analysis()?.insurance ?? null);
+  protected readonly riskLevelCls = (lvl: string | undefined) =>
+    lvl === 'ALTO' ? 'bg-red-100 text-red-800' : lvl === 'MEDIO' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+  protected conditionName(key: string): string {
+    return CONDITION_LABEL[key] ?? key;
+  }
+
+
+  /** Sentinel-2 multi-index weekly series (NDVI / EVI / NDWI). */
+  protected readonly indexChart = computed(() => {
+    const series = this.analysis()?.series ?? [];
+    const ndwiT = this.insParams()?.ndwiTrigger ?? 0.05;
+    return {
+      labels: series.map((o) => shortDate(Date.parse(o.date) / 1000)),
+      series: [
+        { label: 'NDVI', data: series.map((o) => o.mean), color: '#16a34a', fill: true },
+        { label: 'EVI', data: series.map((o) => o.evi), color: '#65a30d' },
+        { label: 'NDWI (agua en hoja)', data: series.map((o) => o.ndwi), color: '#0284c7' },
+        { label: 'Umbral NDWI seguro', data: series.map(() => ndwiT), color: '#dc2626', dashed: true },
+      ] as ChartSeries[],
+    };
+  });
+
+  /** Sentinel-1 radar: VV backscatter (soil moisture proxy) and RVI (biomass). */
+  protected readonly sarChart = computed(() => {
+    const obs = this.analysis()?.sar.observations ?? [];
+    return {
+      labels: obs.map((o) => shortDate(Date.parse(o.date) / 1000)),
+      series: [
+        { label: 'VV (dB) · humedad de suelo', data: obs.map((o) => o.vv_db), color: '#7c3aed', fill: true },
+        { label: 'VH (dB) · biomasa', data: obs.map((o) => o.vh_db), color: '#c026d3' },
+      ] as ChartSeries[],
+    };
+  });
+
+  /** Season water balance: daily rain vs crop demand (ETc) and the root-zone depletion. */
+  protected readonly waterChart = computed(() => {
+    const days = (this.analysis()?.weather.daily ?? []).filter((d) => (d.kc ?? 0) > 0);
+    const raw = this.analysis()?.water_balance.raw_mm ?? null;
+    return {
+      labels: days.map((d) => shortDate(Date.parse(d.date) / 1000)),
+      series: [
+        { label: 'Lluvia (mm)', data: days.map((d) => d.precipitation_mm), color: '#0284c7', fill: true },
+        { label: 'ETc = ET0 × Kc (mm)', data: days.map((d) => d.etc_mm), color: '#f97316' },
+        { label: 'Agotamiento del suelo Dr (mm)', data: days.map((d) => d.soil_depletion_mm), color: '#a16207' },
+        { label: 'Umbral de estrés RAW (mm)', data: days.map(() => raw), color: '#dc2626', dashed: true },
+      ] as ChartSeries[],
+    };
+  });
+
   /** NDVI: Sentinel-2 series from the latest analysis + every value the oracle pushed on-chain. */
   protected readonly ndviChart = computed(() => {
     const series = this.metrics()?.latest_analysis?.series ?? [];
@@ -115,12 +195,17 @@ export class LotDetail implements OnDestroy {
   protected readonly oracleEvents = computed(() =>
     this.events()
       .filter((e) => e.name === 'MetricsUpdated')
-      .map((e) => ({
-        ts: Number(e.args['timestamp'] as bigint),
-        ndvi: Number(e.args['ndvi']) / 10_000,
-        yieldIndex: Number(e.args['yieldIndexBps']) / 10_000,
-        risk: Number(e.args['riskScore']),
-      }))
+      .map((e) => {
+        const m = e.args['metrics'] as OnchainMetricsArgs;
+        return {
+          ts: Number(m.timestamp),
+          ndvi: m.ndvi / 10_000,
+          ndwi: m.ndwi / 10_000,
+          yieldIndex: m.yieldIndexBps / 10_000,
+          risk: m.riskScore,
+          dryDays: m.criticalDryDays,
+        };
+      })
       .sort((a, b) => a.ts - b.ts),
   );
 
@@ -130,27 +215,16 @@ export class LotDetail implements OnDestroy {
     const p = this.params();
     const ev = this.oracleEvents();
     if (!l || !p) return { labels: [] as string[], series: [] as ChartSeries[] };
-    const mult = (y: number, ndvi: number) => {
+    const mult = (y: number, ndvi: number, dryDays: number) => {
       let m = 1 + l.targetApy * y;
-      if (ndvi < p.criticalNdvi) m -= p.droughtHaircut;
+      if (ndvi < p.criticalNdvi || (p.criticalDryDays > 0 && dryDays >= p.criticalDryDays)) m -= p.droughtHaircut;
       return Math.min(p.maxPayout, Math.max(p.minPayout, m));
     };
     return {
       labels: ev.map((e) => dateTime(e.ts)),
       series: [
-        { label: 'Pago por token (USDC)', data: ev.map((e) => +(l.pricePerToken * mult(e.yieldIndex, e.ndvi)).toFixed(4)), color: '#047857', fill: true },
+        { label: 'Pago por token (USDC)', data: ev.map((e) => +(l.pricePerToken * mult(e.yieldIndex, e.ndvi, e.dryDays)).toFixed(4)), color: '#047857', fill: true },
         { label: 'Capital (precio del token)', data: ev.map(() => l.pricePerToken), color: '#78716c', dashed: true },
-      ] as ChartSeries[],
-    };
-  });
-
-  protected readonly rainChart = computed(() => {
-    const days = this.metrics()?.latest_analysis?.weather.daily ?? [];
-    return {
-      labels: days.map((d) => shortDate(Date.parse(d.date) / 1000)),
-      series: [
-        { label: 'Lluvia (mm)', data: days.map((d) => d.precipitation_mm), color: '#0284c7' },
-        { label: 'ET0 (mm)', data: days.map((d) => d.et0_mm), color: '#f97316' },
       ] as ChartSeries[],
     };
   });
@@ -188,7 +262,13 @@ export class LotDetail implements OnDestroy {
       case 'SurplusReturned': return `${u('amount')} USDC devueltos al productor`;
       case 'GoalReachedEvent': case 'CampaignFailed': return `Recaudado ${u('raised')} USDC`;
       case 'Settled': return `Multiplicador ${(Number(a['multiplierBps']) / 10_000).toFixed(4)}× · ${u('payoutPerToken')} USDC/token${a['drought'] ? ' · sequía' : ''}`;
-      case 'MetricsUpdated': return `NDVI ${(Number(a['ndvi']) / 10_000).toFixed(3)} · riesgo ${a['riskScore']} · yield ${(Number(a['yieldIndexBps']) / 10_000).toFixed(3)}`;
+      case 'MetricsUpdated': {
+        const m = a['metrics'] as OnchainMetricsArgs;
+        return `NDVI ${(m.ndvi / 10_000).toFixed(3)} · NDWI ${(m.ndwi / 10_000).toFixed(3)} · riesgo ${m.riskScore} · yield ${(m.yieldIndexBps / 10_000).toFixed(3)} · balance ${m.waterBalanceMm} mm · ${m.criticalDryDays} días críticos`;
+      }
+      case 'InsurancePremiumCollected': return `${u('amount')} USDC de prima (3% del capital) al pool`;
+      case 'InsurancePoolFunded': return `${shortAddr(a['from'] as string)} aportó ${u('amount')} USDC al pool`;
+      case 'InsuranceExecuted': return `Cobertura ${u('coverage')} USDC · NDWI ${(Number(a['ndwi']) / 10_000).toFixed(3)} · lluvia ${(Number(a['rainVsNormalBps']) / 100).toFixed(0)}% del histórico · ${a['criticalDryDays']} días críticos`;
       case 'LotCreated': return `${a['name']} (${a['crop']})`;
       default: return '';
     }
@@ -203,6 +283,7 @@ export class LotDetail implements OnDestroy {
     try {
       await this.refresh();
       this.params.set(await this.lotsSvc.payoutParams());
+      this.insParams.set(await this.lotsSvc.insuranceParams());
     } catch (e) {
       this.error.set(errorMessage(e));
     } finally {
@@ -214,6 +295,7 @@ export class LotDetail implements OnDestroy {
     const id = Number(this.id());
     await this.lotsSvc.refreshChainTime();
     this.lot.set(await this.lotsSvc.load(id));
+    this.lotsSvc.insurancePool().then((p) => this.pool.set(p), () => undefined);
     this.api.metrics(id).then(
       (m) => { this.metrics.set(m); this.metricsError.set(null); },
       (e) => this.metricsError.set(apiError(e)),
@@ -299,6 +381,24 @@ export class LotDetail implements OnDestroy {
     const l = this.lot()!;
     return this.run('settle', () =>
       this.wallet.write(`Liquidar ${l.name}`, { address: this.vault(), abi: CampaignVaultAbi, functionName: 'settle', args: [BigInt(l.id)] }));
+  }
+
+  protected executeInsurance(): Promise<void> {
+    const l = this.lot()!;
+    return this.run('insurance', () =>
+      this.wallet.write(`Ejecutar seguro paramétrico ${l.name}`, {
+        address: this.vault(), abi: CampaignVaultAbi, functionName: 'executeInsurance', args: [BigInt(l.id)],
+      }));
+  }
+
+  protected fundPool(): Promise<void> {
+    const amount = parseUnits(String(Math.max(1, this.poolAmount())), USDC_DECIMALS);
+    return this.run('pool', async () => {
+      await this.wallet.ensureAllowance(this.vault(), amount);
+      await this.wallet.write(`Aportar ${usd(this.poolAmount())} USDC al pool de seguro`, {
+        address: this.vault(), abi: CampaignVaultAbi, functionName: 'fundInsurancePool', args: [amount],
+      });
+    });
   }
 
   protected pushOracle(): Promise<void> {

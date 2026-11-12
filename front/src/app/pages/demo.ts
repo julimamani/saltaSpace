@@ -31,6 +31,9 @@ import { StatusBadge } from '../shared/status-badge';
           <dl class="grid grid-cols-2 gap-y-1.5 text-sm">
             <dt class="text-stone-500">Escenario backend</dt><dd class="text-right font-semibold">{{ scenario() ?? '—' }}</dd>
             <dt class="text-stone-500">NDVI on-chain</dt><dd class="text-right font-medium">{{ l.metrics?.ndvi?.toFixed(3) ?? '—' }}</dd>
+            <dt class="text-stone-500">NDWI on-chain</dt><dd class="text-right font-medium">{{ l.metrics?.ndwi?.toFixed(3) ?? '—' }}</dd>
+            <dt class="text-stone-500">Días críticos / lluvia vs hist.</dt><dd class="text-right font-medium">{{ l.metrics ? l.metrics.criticalDryDays + ' d · ' + pct(l.metrics.rainVsNormal, 0) : '—' }}</dd>
+            <dt class="text-stone-500">Seguro paramétrico</dt><dd class="text-right font-semibold" [class.text-red-700]="l.insurance.triggered">{{ l.insurance.executed ? 'ejecutado' : l.insurance.triggered ? 'TRIGGER activo' : 'sin trigger' }}</dd>
             <dt class="text-stone-500">Riesgo</dt><dd class="text-right font-medium">{{ l.metrics?.riskScore ?? '—' }}</dd>
             <dt class="text-stone-500">Yield index</dt><dd class="text-right font-medium">{{ l.metrics?.yieldIndex?.toFixed(3) ?? '—' }}</dd>
             <dt class="text-stone-500">Pago / token</dt><dd class="text-right font-semibold" [class.text-red-700]="l.preview.drought">{{ usd(l.preview.payoutPerToken) }} USDC</dd>
@@ -45,13 +48,13 @@ import { StatusBadge } from '../shared/status-badge';
         <h2 class="card-title mb-3">1 · Escenario climático (oráculo)</h2>
         <div class="grid gap-3 sm:grid-cols-3">
           <button class="scenario border-red-200 bg-red-50 hover:bg-red-100" (click)="setScenario('drought')" [disabled]="!!busy()">
-            <span class="text-2xl">🔥</span><b>Sequía</b><span>NDVI 0.22, déficit hídrico alto → penalización</span>
+            <span class="text-2xl">🔥</span><b>Sequía</b><span>NDVI 0.22, NDWI −0.15, lluvia al 15%, radar con suelo seco → penalización + trigger del seguro</span>
           </button>
           <button class="scenario border-emerald-200 bg-emerald-50 hover:bg-emerald-100" (click)="setScenario('excellent')" [disabled]="!!busy()">
-            <span class="text-2xl">🌾</span><b>Cosecha excelente</b><span>NDVI 0.85, lluvias normales → techo de pago</span>
+            <span class="text-2xl">🌾</span><b>Cosecha excelente</b><span>NDVI 0.85, NDWI 0.35, lluvias por encima de ETc → techo de pago</span>
           </button>
           <button class="scenario border-sky-200 bg-sky-50 hover:bg-sky-100" (click)="setScenario('real')" [disabled]="!!busy()">
-            <span class="text-2xl">🛰️</span><b>Datos reales</b><span>Sentinel‑2 + Open‑Meteo + NASA POWER</span>
+            <span class="text-2xl">🛰️</span><b>Datos reales</b><span>Sentinel‑2 + Sentinel‑1 + Open‑Meteo + NASA POWER</span>
           </button>
         </div>
         @if (busy() === 'scenario') { <p class="mt-3 text-sm text-stone-500">Analizando y publicando en la cadena…</p> }
@@ -74,7 +77,8 @@ import { StatusBadge } from '../shared/status-badge';
           <ol class="list-decimal space-y-0.5 pl-5">
             <li>Faucet de USDC → invertir hasta completar la meta del lote.</li>
             <li>Liberar fondos al productor.</li>
-            <li>Elegir “Sequía”: el pago por token cae por la penalización (NDVI &lt; 0.30).</li>
+            <li>Elegir “Sequía”: el pago por token cae por la penalización (NDVI &lt; 0.30 o ≥ 10 días críticos) y se activa el trigger del seguro.</li>
+            <li>En el detalle, “Ejecutar cobertura”: el pool paga 20% del capital al lote sin perito (o lo hace <code>settle()</code> solo).</li>
             <li>Elegir “Cosecha excelente”: el pago sube hasta el techo (1.3×).</li>
             <li>Depositar repago → liquidar → cobrar.</li>
           </ol>

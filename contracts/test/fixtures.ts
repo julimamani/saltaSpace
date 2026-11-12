@@ -65,14 +65,46 @@ export async function fundedFixture() {
   return f;
 }
 
+export type MetricsInput = {
+  ndvi: number;
+  ndwi: number;
+  riskScore: number;
+  yieldIndexBps: number;
+  waterBalanceMm: number;
+  criticalDryDays: number;
+  rainVsNormalBps: number;
+  ndviDropBps: number;
+  soilDryDays: number;
+  timestamp: bigint;
+  dataHash: string;
+};
+
+/** Healthy-crop defaults; override only what the test is about. */
+export async function metrics(over: Partial<MetricsInput> = {}): Promise<MetricsInput> {
+  const ts = BigInt(await time.latest());
+  return {
+    ndvi: 6_500,
+    ndwi: 2_000,
+    riskScore: 30,
+    yieldIndexBps: 10_000,
+    waterBalanceMm: 40,
+    criticalDryDays: 0,
+    rainVsNormalBps: 10_000,
+    ndviDropBps: 0,
+    soilDryDays: 0,
+    timestamp: ts,
+    dataHash: ethers.id(`metrics-${ts}`),
+    ...over,
+  };
+}
+
 export async function pushMetrics(
   f: Awaited<ReturnType<typeof deployFixture>>,
   ndvi: number,
   riskScore: number,
   yieldIndexBps: number,
+  over: Partial<MetricsInput> = {},
 ) {
-  const ts = BigInt(await time.latest());
-  return f.oracle
-    .connect(f.oracleSigner)
-    .updateLotMetrics(0, ndvi, riskScore, yieldIndexBps, ts, ethers.id(`metrics-${ndvi}-${ts}`));
+  const m = await metrics({ ndvi, riskScore, yieldIndexBps, ...over });
+  return f.oracle.connect(f.oracleSigner).updateLotMetrics(0, m);
 }

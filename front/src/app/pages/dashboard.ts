@@ -18,7 +18,8 @@ import { LotCard } from '../shared/lot-card';
       <h1 class="max-w-2xl text-3xl font-bold leading-tight sm:text-5xl">Financiá cosechas del norte argentino con datos satelitales reales</h1>
       <p class="mt-4 max-w-2xl text-emerald-50/90">
         Productores de Salta, Jujuy y Tucumán tokenizan un lote antes de sembrar. Inversores compran fracciones con USDC de prueba
-        y, al cosechar, un contrato inteligente liquida el pago según el NDVI de Sentinel‑2 y el clima de Open‑Meteo / NASA POWER.
+        y, al cosechar, un contrato inteligente liquida el pago según Sentinel‑2 (NDVI/NDWI), radar Sentinel‑1 y el balance hídrico
+        Penman‑Monteith de Open‑Meteo / NASA POWER. Un <b>seguro paramétrico embebido</b> paga solo cuando los datos marcan sequía: sin peritos.
       </p>
       <div class="mt-6 flex flex-wrap gap-3">
         <a routerLink="/lots" class="rounded-xl bg-white px-5 py-3 font-semibold text-emerald-900 shadow hover:bg-lime-50">Ver lotes para invertir</a>
@@ -31,6 +32,10 @@ import { LotCard } from '../shared/lot-card';
       <div class="stat"><p class="stat-label">Lotes activos</p><p class="stat-value">{{ activeCount() }} <span class="text-base font-medium text-stone-500">/ {{ lots().length }}</span></p></div>
       <div class="stat"><p class="stat-label">Retorno estimado promedio</p><p class="stat-value text-emerald-700">{{ pct(avgReturn()) }}</p></div>
       <div class="stat"><p class="stat-label">Hectáreas tokenizadas</p><p class="stat-value">{{ totalHa().toLocaleString('es-AR') }} <span class="text-base font-medium text-stone-500">ha</span></p></div>
+    </section>
+    <section class="mt-4 grid gap-4 sm:grid-cols-2">
+      <div class="stat"><p class="stat-label">Pool de seguro paramétrico</p><p class="stat-value">{{ pool() !== null ? usd(pool()!, 0) : '—' }} <span class="text-base font-medium text-stone-500">USDC</span></p><p class="text-xs text-stone-500">3% de cada capital liberado + aportes. Paga cobertura automática cuando el oráculo marca sequía.</p></div>
+      <div class="stat"><p class="stat-label">Lotes con trigger de seguro</p><p class="stat-value" [class.text-red-700]="triggered() > 0">{{ triggered() }}</p><p class="text-xs text-stone-500">NDWI bajo + lluvia &lt; 50% del histórico o días críticos secos en floración; caída de NDVI; suelo seco en radar.</p></div>
     </section>
 
     <section class="mt-4 flex flex-wrap gap-2 text-xs">
@@ -86,6 +91,8 @@ export class Dashboard {
   protected readonly error = signal<string | null>(null);
   protected readonly health = signal<HealthResponse | null>(null);
   protected readonly healthError = signal(false);
+  protected readonly pool = signal<number | null>(null);
+  protected readonly triggered = computed(() => this.lots().filter((l) => l.insurance.triggered && l.status === 'Funded').length);
   protected readonly usd = usd;
   protected readonly pct = pct;
 
@@ -101,7 +108,7 @@ export class Dashboard {
     { t: 'Registro del lote', d: 'El productor dibuja el polígono; el backend analiza NDVI y clima reales y crea el lote on-chain.' },
     { t: 'Inversión fraccionada', d: 'Los inversores compran tokens ERC‑20 del lote con USDC de prueba.' },
     { t: 'Financiamiento', d: 'Al alcanzar la meta, el productor recibe el capital antes de la siembra.' },
-    { t: 'Liquidación por datos', d: 'El oráculo publica NDVI, riesgo e índice de rendimiento; el contrato calcula el pago.' },
+    { t: 'Liquidación por datos', d: 'El oráculo publica NDVI/NDWI, balance hídrico y radar; el contrato calcula el pago y ejecuta el seguro paramétrico si corresponde.' },
   ];
 
   constructor() {
@@ -114,6 +121,7 @@ export class Dashboard {
   private async load(): Promise<void> {
     try {
       this.lots.set(await this.lotsSvc.loadAll());
+      this.pool.set(await this.lotsSvc.insurancePool());
     } catch (e) {
       this.error.set(errorMessage(e));
     } finally {

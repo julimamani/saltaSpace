@@ -1,8 +1,12 @@
-"""Sentinel-2 L2A NDVI from the Earth Search STAC API (AWS open data COGs).
+"""Sentinel-2 L2A vegetation indices from the Earth Search STAC API (AWS open data COGs).
 
-For each selected scene we read only the window covering the lot (COG range requests),
-mask clouds/shadows with the SCL band, clip to the polygon and compute
-NDVI = (B08 - B04) / (B08 + B04) on surface reflectance.
+For each selected scene (best scene per ISO week) we read only the window covering the lot
+(COG range requests), mask clouds/shadows with the SCL band, clip to the polygon and compute
+on surface reflectance:
+    NDVI = (B08 - B04) / (B08 + B04)                       vigor (saturates on dense canopies)
+    EVI  = 2.5 (B08 - B04) / (B08 + 6 B04 - 7.5 B02 + 1)   vigor, atmosphere/soil corrected
+    NDWI = (B08 - B11) / (B08 + B11)                       leaf water content (Gao 1996)
+    LAI  = 3.618 EVI - 0.118                               leaf area, biomass proxy (Boegh 2002)
 If anything fails we fall back to a deterministic mock series flagged `source="mock"`.
 """
 
@@ -19,7 +23,9 @@ from typing import Any
 import numpy as np
 
 from ..config import Settings
-from ..schemas import NdviObservation
+from ..schemas import IndexObservation
+
+NdviObservation = IndexObservation
 
 log = logging.getLogger(__name__)
 
@@ -54,8 +60,13 @@ def _contains_bbox(item_bbox: list[float], bbox: tuple[float, float, float, floa
     return item_bbox[0] <= bbox[0] and item_bbox[1] <= bbox[1] and item_bbox[2] >= bbox[2] and item_bbox[3] >= bbox[3]
 
 
+def week_label(d: date) -> str:
+    y, w, _ = d.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
 def search_scenes(geometry: dict[str, Any], start: date, end: date, s: Settings) -> list[Any]:
-    """Least-cloudy scene per acquisition date, evenly sampled down to `max_scenes`."""
+    """Least-cloudy scene per ISO week (weekly series), sampled down to `max_scenes` if needed."""
     from pystac_client import Client
 
     client = Client.open(s.stac_url)
@@ -76,9 +87,10 @@ def search_scenes(geometry: dict[str, Any], start: date, end: date, s: Settings)
         if d is None:
             continue
         cc = item.properties.get("eo:cloud_cover", 100)
-        if d not in by_day or cc < by_day[d].properties.get("eo:cloud_cover", 100):
-            by_day[d] = item
-    items = [by_day[d] for d in sorted(by_day)]
+        wk = week_label(d)
+        if wk not in by_day or cc < by_day[wk].properties.get("eo:cloud_cover", 100):
+            by_day[wk] = item
+    items = sorted(by_day.values(), key=lambda i: i.datetime)
     if len(items) > s.max_scenes:
         # Always keep the latest scene; spread the rest across the window.
         idx = np.linspace(0, len(items) - 1, s.max_scenes).round().astype(int)
@@ -86,9 +98,15 @@ def search_scenes(geometry: dict[str, Any], start: date, end: date, s: Settings)
     return items
 
 
-def _band_scale(asset: Any) -> tuple[float, float]:
+def _band_scale(asset: Any, item: Any | None = None) -> tuple[float, float]:
+    """DN -> surface reflectance. Earth Search already applies the ESA BOA_ADD_OFFSET (-1000 DN)
+    to its COGs when `earthsearch:boa_offset_applied` is true, so the -0.1 offset listed in
+    `raster:bands` must NOT be applied again (it would overstate NDVI, e.g. 0.51 -> 0.87)."""
     bands = asset.extra_fields.get("raster:bands") or [{}]
-    return float(bands[0].get("scale", 0.0001)), float(bands[0].get("offset", 0.0))
+    offset = float(bands[0].get("offset", 0.0))
+    if item is not None and item.properties.get("earthsearch:boa_offset_applied"):
+        offset = 0.0
+    return float(bands[0].get("scale", 0.0001)), offset
 
 
 def _read_window(href: str, geometry: dict[str, Any], out_shape: tuple[int, int] | None = None):
@@ -117,7 +135,12 @@ def _read_window(href: str, geometry: dict[str, Any], out_shape: tuple[int, int]
         return arr, src.window_transform(window), src.crs, geom, src.nodata
 
 
-def ndvi_for_scene(item: Any, geometry: dict[str, Any]) -> NdviObservation:
+def _scaled(item: Any, key: str, raw: np.ndarray) -> np.ndarray:
+    scale, off = _band_scale(item.assets[key], item)
+    return raw.astype("float64") * scale + off
+
+
+def indices_for_scene(item: Any, geometry: dict[str, Any]) -> IndexObservation:
     import rasterio
     from rasterio.features import geometry_mask
     from rasterio.transform import Affine
@@ -127,9 +150,12 @@ def ndvi_for_scene(item: Any, geometry: dict[str, Any]) -> NdviObservation:
         nir_raw, *_ = _read_window(item.assets["nir"].href, geometry)
         if nir_raw.shape != red_raw.shape:
             raise ValueError("band shapes differ")
-        scl = None
+        blue_raw = swir_raw = scl = None
+        if "blue" in item.assets:
+            blue_raw, *_ = _read_window(item.assets["blue"].href, geometry)
+        if "swir16" in item.assets:  # B11 is 20 m: resample onto the 10 m grid
+            swir_raw, *_ = _read_window(item.assets["swir16"].href, geometry, out_shape=red_raw.shape)
         if "scl" in item.assets:
-            # SCL is 20 m; resample the same window onto the 10 m grid.
             scl, *_ = _read_window(item.assets["scl"].href, geometry, out_shape=red_raw.shape)
 
     inside = ~geometry_mask([geom], out_shape=red_raw.shape, transform=Affine(*transform[:6]), all_touched=True)
@@ -137,36 +163,56 @@ def ndvi_for_scene(item: Any, geometry: dict[str, Any]) -> NdviObservation:
     if scl is not None:
         valid &= np.isin(scl, CLEAR_SCL)
 
-    r_scale, r_off = _band_scale(item.assets["red"])
-    n_scale, n_off = _band_scale(item.assets["nir"])
-    red = red_raw.astype("float64") * r_scale + r_off
-    nir = nir_raw.astype("float64") * n_scale + n_off
+    red, nir = _scaled(item, "red", red_raw), _scaled(item, "nir", nir_raw)
     denom = nir + red
     valid &= denom > 0
     if valid.sum() < 1:
         raise ValueError("no clear pixels over the lot")
-    ndvi = (nir[valid] - red[valid]) / denom[valid]
-    ndvi = np.clip(ndvi, -1, 1)
-    return NdviObservation(
+    ndvi = np.clip((nir[valid] - red[valid]) / denom[valid], -1, 1)
+
+    evi = ndwi = lai = None
+    if blue_raw is not None and blue_raw.shape == red_raw.shape:
+        blue = _scaled(item, "blue", blue_raw)
+        d = nir[valid] + 6 * red[valid] - 7.5 * blue[valid] + 1
+        ok = np.abs(d) > 1e-6
+        if ok.any():
+            evi_px = np.clip(2.5 * (nir[valid][ok] - red[valid][ok]) / d[ok], -1, 1)
+            evi = float(evi_px.mean())
+            lai = float(np.clip(3.618 * evi - 0.118, 0, 8))
+    if swir_raw is not None:
+        swir = _scaled(item, "swir16", swir_raw)
+        d = nir[valid] + swir[valid]
+        ok = d > 0
+        if ok.any():
+            ndwi = float(np.clip((nir[valid][ok] - swir[valid][ok]) / d[ok], -1, 1).mean())
+
+    return IndexObservation(
         date=item.datetime.date(),
         mean=round(float(ndvi.mean()), 4),
         min=round(float(ndvi.min()), 4),
         max=round(float(ndvi.max()), 4),
+        evi=None if evi is None else round(evi, 4),
+        ndwi=None if ndwi is None else round(ndwi, 4),
+        lai=None if lai is None else round(lai, 3),
         scene_id=item.id,
         cloud_cover=round(float(item.properties.get("eo:cloud_cover", 0)), 2),
         valid_pixels=int(valid.sum()),
+        week=week_label(item.datetime.date()),
         source="sentinel-2",
     )
 
 
-def real_ndvi_series(geometry: dict[str, Any], start: date, end: date, s: Settings) -> list[NdviObservation]:
+ndvi_for_scene = indices_for_scene
+
+
+def real_ndvi_series(geometry: dict[str, Any], start: date, end: date, s: Settings) -> list[IndexObservation]:
     items = search_scenes(geometry, start, end, s)
     if not items:
         raise LookupError("no Sentinel-2 scenes under the cloud threshold")
     log.info("NDVI: %d scene(s) selected: %s", len(items), [i.id for i in items])
-    results: list[NdviObservation] = []
+    results: list[IndexObservation] = []
     with ThreadPoolExecutor(max_workers=4) as pool:
-        for item, fut in [(i, pool.submit(ndvi_for_scene, i, geometry)) for i in items]:
+        for item, fut in [(i, pool.submit(indices_for_scene, i, geometry)) for i in items]:
             try:
                 results.append(fut.result())
             except Exception as exc:  # one bad scene should not kill the series
@@ -184,28 +230,33 @@ def _seed(geometry: dict[str, Any], d: date) -> int:
     return int(hashlib.sha256(key.encode()).hexdigest()[:8], 16)
 
 
-def mock_observation(geometry: dict[str, Any], d: date) -> NdviObservation:
+def mock_observation(geometry: dict[str, Any], d: date) -> IndexObservation:
     """Deterministic NDVI: a southern-hemisphere summer-crop curve (peak ~Feb) + seeded noise."""
     rng = np.random.default_rng(_seed(geometry, d))
     season = 0.5 + 0.25 * math.cos(2 * math.pi * (d.timetuple().tm_yday - 45) / 365)
     mean = float(np.clip(season + rng.normal(0, 0.03), 0.1, 0.9))
     spread = float(rng.uniform(0.08, 0.18))
-    return NdviObservation(
+    evi = float(np.clip(0.75 * mean - 0.05 + rng.normal(0, 0.02), 0.0, 1.0))
+    return IndexObservation(
         date=d,
         mean=round(mean, 4),
         min=round(max(-1.0, mean - spread), 4),
         max=round(min(1.0, mean + spread * 0.6), 4),
+        evi=round(evi, 4),
+        ndwi=round(float(np.clip(0.6 * mean - 0.15 + rng.normal(0, 0.02), -0.5, 0.6)), 4),
+        lai=round(float(np.clip(3.618 * evi - 0.118, 0, 8)), 3),
+        week=week_label(d),
         source="mock",
     )
 
 
-def mock_ndvi_series(geometry: dict[str, Any], start: date, end: date, n: int) -> list[NdviObservation]:
+def mock_ndvi_series(geometry: dict[str, Any], start: date, end: date, n: int) -> list[IndexObservation]:
     span = max(1, (end - start).days)
     days = sorted({start + timedelta(days=round(span * i / max(1, n - 1))) for i in range(n)})
     return [mock_observation(geometry, d) for d in days]
 
 
-def get_ndvi_series(geometry: dict[str, Any], start: date, end: date, s: Settings) -> list[NdviObservation]:
+def get_ndvi_series(geometry: dict[str, Any], start: date, end: date, s: Settings) -> list[IndexObservation]:
     if not s.force_mock_ndvi:
         try:
             return real_ndvi_series(geometry, start, end, s)
