@@ -37,6 +37,8 @@ export class LotMap implements OnDestroy {
   readonly geometry = input<PolygonGeometry | null>(null);
   readonly editable = input(false);
   readonly height = input('22rem');
+  /** [lat, lon] to fly to and mark (e.g. typed farm coordinates). */
+  readonly focus = input<[number, number] | null>(null);
   readonly geometryChange = output<PolygonGeometry | null>();
 
   protected readonly ready = signal(false);
@@ -47,6 +49,7 @@ export class LotMap implements OnDestroy {
   private L?: typeof Leaflet;
   private map?: Leaflet.Map;
   private layer?: Leaflet.LayerGroup;
+  private focusMarker?: Leaflet.CircleMarker;
 
   constructor() {
     afterNextRender(async () => {
@@ -78,6 +81,11 @@ export class LotMap implements OnDestroy {
       this.geometry();
       if (this.ready()) untracked(() => this.syncFromInput(true));
     });
+
+    effect(() => {
+      const f = this.focus();
+      if (this.ready()) untracked(() => this.showFocus(f));
+    });
   }
 
   ngOnDestroy(): void {
@@ -100,6 +108,16 @@ export class LotMap implements OnDestroy {
     this.closed.set(false);
     this.redraw();
     this.geometryChange.emit(null);
+  }
+
+  private showFocus(f: [number, number] | null): void {
+    const L = this.L;
+    if (!L || !this.map) return;
+    this.focusMarker?.remove();
+    this.focusMarker = undefined;
+    if (!f) return;
+    this.focusMarker = L.circleMarker(f, { radius: 8, color: '#fff', weight: 3, fillColor: '#dc2626', fillOpacity: 1 }).addTo(this.map);
+    this.map.setView(f, Math.max(this.map.getZoom(), 15));
   }
 
   private syncFromInput(fit: boolean): void {
