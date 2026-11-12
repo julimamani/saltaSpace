@@ -60,3 +60,14 @@ def test_rain_vs_normal_is_neutral_in_the_dry_season():
     sowing = date(2026, 7, 1)
     wb = hydro.water_balance(_weather(sowing, 30, rain_every=None, normal=5.0), "trigo", sowing + timedelta(days=29), sowing, None, S)
     assert wb.rain_vs_normal == 1.0
+
+
+def test_weather_gaps_do_not_understate_rain_vs_normal():
+    sowing = date(2026, 1, 1)
+    w = _weather(sowing, 60, rain_every=2, normal=180.0)  # 3 mm/day normal, 10 mm/day observed
+    w.daily = [d for d in w.daily if d.date.day % 3]  # drop a third of the days
+    wb = hydro.water_balance(w, "soja", sowing + timedelta(days=59), sowing, None, S)
+    assert abs(wb.rain_vs_normal - 10 / 3) < 0.05
+    w.climatology_mm_day = {"JAN": 3.0}  # FEB missing -> no normal, analysis still works
+    wb2 = hydro.water_balance(w, "soja", sowing + timedelta(days=59), sowing, None, S)
+    assert wb2.rain_vs_normal is None and wb2.normal_rain_mm is None

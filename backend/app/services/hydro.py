@@ -64,9 +64,11 @@ def summarize(w: WeatherSummary, crop: CropProfile, sowing: date, basis: str, ha
     normal: float | None = None
     ratio: float | None = None
     if season_days and w.climatology_mm_day:
-        # Normal rain for the season's own calendar days (not the whole data window).
-        normal = normal_rain(w.climatology_mm_day, season_days[0].date, season_days[-1].date)
-        ratio = round(rain / normal, 3) if normal >= s.min_normal_rain_mm else 1.0
+        # Normal rain for exactly the observed season days, so gaps in the weather series do not
+        # understate the ratio.
+        normal = normal_rain(w.climatology_mm_day, [d.date for d in season_days])
+        if normal is not None:
+            ratio = round(rain / normal, 3) if normal >= s.min_normal_rain_mm else 1.0
     taw = 1000 * s.soil_available_water_m3_m3 * crop.root_depth_m
     return WaterBalance(
         crop=crop.key,

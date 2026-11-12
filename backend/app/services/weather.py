@@ -158,13 +158,15 @@ def fetch_climatology(lat: float, lon: float, s: Settings, client: httpx.Client)
     return {k: float(v) for k, v in p.items() if k != "ANN"}
 
 
-def normal_rain(clim: dict[str, float], start: date, end: date) -> float:
-    """Climatological rain for a calendar window, summing each day's monthly normal."""
+def normal_rain(clim: dict[str, float], days: list[date]) -> float | None:
+    """Climatological rain for the given (observed) days, summing each day's monthly normal.
+    None when the climatology lacks a needed month."""
     total = 0.0
-    d = start
-    while d <= end:
-        total += clim[calendar.month_abbr[d.month].upper()]
-        d += timedelta(days=1)
+    for d in days:
+        v = clim.get(calendar.month_abbr[d.month].upper())
+        if v is None:
+            return None
+        total += v
     return round(total, 1)
 
 
@@ -196,7 +198,10 @@ def get_weather(lat: float, lon: float, start: date, end: date, s: Settings) -> 
             errors.append(f"nasa-power: {exc}")
         try:
             clim = fetch_climatology(lat, lon, s, client)
-            normal = normal_rain(clim, start, end)
+            normal = normal_rain(clim, [start + timedelta(days=i) for i in range((end - start).days + 1)])
+            if normal is None:
+                clim = None
+                raise ValueError("climatology missing a month")
             sources.append("nasa-power-climatology")
         except Exception as exc:
             errors.append(f"nasa-power climatology: {exc}")
