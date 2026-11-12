@@ -1,8 +1,8 @@
-# AgroToken · saltaSpace
+# OrbiTag · saltaSpace
 
 > **Prototipo MVP.** Los lotes y tokens son **simulados**; no hay tokenización legal, oferta pública ni valor real. Solo Avalanche Fuji / red local.
 
-AgroToken es un prototipo de hackathon (48 h) de tokenización B2B de activos agrícolas (RWA) del norte argentino sobre **Avalanche**. El activo es simulado, pero su comportamiento financiero depende de **datos reales**: NDVI de Sentinel‑2 y clima de Open‑Meteo / NASA POWER.
+OrbiTag es un prototipo de hackathon (48 h) de tokenización B2B de activos agrícolas (RWA) del norte argentino sobre **Avalanche**. El activo es simulado, pero su comportamiento financiero depende de **datos reales**: NDVI de Sentinel‑2 y clima de Open‑Meteo / NASA POWER.
 
 1. El productor registra un lote (polígono en el mapa) y el backend lo analiza con datos satelitales.
 2. Se crea una campaña on-chain con un token ERC‑20 propio del lote.
@@ -79,7 +79,7 @@ Docs interactivas en http://localhost:8000/docs.
 
 ### Oráculo multifuente y seguro paramétrico
 
-> *"En las finanzas tradicionales, si un productor pierde su cosecha por sequía, un perito debe viajar al lote, evaluar el daño (subjetivo) y el seguro tarda meses en pagar. AgroToken resuelve esto con un seguro paramétrico embebido en el token: el oráculo mide, el contrato paga."*
+> *"En las finanzas tradicionales, si un productor pierde su cosecha por sequía, un perito debe viajar al lote, evaluar el daño (subjetivo) y el seguro tarda meses en pagar. OrbiTag resuelve esto con un seguro paramétrico embebido en el token: el oráculo mide, el contrato paga."*
 
 1. **ET0 FAO‑56 Penman‑Monteith** (`backend/app/services/et0.py`): temperatura mín/máx, radiación, humedad y viento diarios de Open‑Meteo (NASA POWER como respaldo). El ET0 propio se compara con el de Open‑Meteo (`et0_ref_mm`, diferencia < 5%).
 2. **ETc = ET0 × Kc** (`crops.py`): coeficientes y duración de etapas FAO‑56 para soja, maíz, poroto, tabaco, trigo y caña. La etapa media es la floración.

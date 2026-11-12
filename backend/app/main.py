@@ -1,4 +1,4 @@
-"""AgroToken backend: satellite/weather analytics + on-chain oracle for Avalanche Fuji."""
+"""OrbiTag backend: satellite/weather analytics + on-chain oracle for Avalanche Fuji."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -16,7 +16,7 @@ from .services.oracle import push_active_lots
 
 settings = get_settings()
 setup_logging(settings.log_level)
-log = logging.getLogger("agrotoken")
+log = logging.getLogger("orbitag")
 
 
 @asynccontextmanager
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="AgroToken API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="OrbiTag API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,

@@ -4,7 +4,7 @@ Preparación: `docker compose up --build`, wallet (Core/MetaMask) con la red loc
 
 | Tiempo | Acción | Qué decir |
 |---|---|---|
-| 0:00 | Inicio: señalar el banner amarillo y las métricas. | "AgroToken tokeniza lotes agrícolas del norte argentino. Es un prototipo educativo en testnet: el activo es simulado, pero su comportamiento financiero depende de datos satelitales reales." |
+| 0:00 | Inicio: señalar el banner amarillo y las métricas. | "OrbiTag tokeniza lotes agrícolas del norte argentino. Es un prototipo educativo en testnet: el activo es simulado, pero su comportamiento financiero depende de datos satelitales reales." |
 | 0:20 | Conectar wallet → menú de la wallet → **Faucet +10.000 USDC**. | "Usamos USDC de prueba en Avalanche." |
 | 0:35 | **Registrar lote** → "Usar lote de ejemplo" (o dibujar) → **Analizar lote**. | "El backend toma la mejor escena Sentinel‑2 de cada semana y calcula NDVI, EVI y NDWI (agua en hoja); lee el radar Sentinel‑1, que atraviesa nubes; y arma el balance hídrico con ET0 Penman‑Monteith × Kc del cultivo contra la lluvia real y el histórico. Sale un riesgo 0–100, un índice de rendimiento y la evaluación del seguro." |
 | 1:05 | **Crear lote on-chain** (plazos cortos de demo). Mostrar el toast con la tx. | "El polígono queda anclado on-chain con su hash; se crea un token ERC‑20 propio del lote." |

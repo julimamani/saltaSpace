@@ -20,7 +20,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('.disclaimer')?.textContent).toContain('Prototipo educativo / testnet');
-    expect(el.textContent).toContain('AgroToken');
+    expect(el.querySelector('.disclaimer')?.textContent).toContain('testnet');
+    expect(el.textContent).toContain('OrbiTag');
   });
 });

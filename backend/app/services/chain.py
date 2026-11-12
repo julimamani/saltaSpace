@@ -1,4 +1,4 @@
-"""web3.py access to the AgroToken contracts (read lots, push oracle metrics)."""
+"""web3.py access to the OrbiTag contracts (read lots, push oracle metrics)."""
 
 from __future__ import annotations
 

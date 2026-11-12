@@ -21,7 +21,7 @@ interface CropGroup {
       <p class="mb-3 inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider">Nosotros · Tecnología</p>
       <h1 class="max-w-3xl text-3xl font-bold leading-tight sm:text-4xl">No se puede tokenizar cualquier cosa</h1>
       <p class="mt-4 max-w-3xl text-emerald-50/90">
-        AgroToken financia la producción de economías regionales del norte argentino con tokens en Avalanche, cuyo pago depende de datos
+        OrbiTag financia la producción de economías regionales del norte argentino con tokens en Avalanche, cuyo pago depende de datos
         satelitales y climáticos reales. Para que un Activo del Mundo Real (RWA) sea viable financieramente, el producto físico que lo respalda
         tiene que cumplir tres condiciones.
       </p>

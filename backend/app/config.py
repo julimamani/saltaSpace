@@ -74,7 +74,7 @@ class Settings(BaseSettings):
 
     # --- api
     cors_origins: str = "http://localhost:4200,http://127.0.0.1:4200,http://localhost:4000"
-    database_path: str = str(APP_DIR.parent / "data" / "agrotoken.db")
+    database_path: str = str(APP_DIR.parent / "data" / "orbitag.db")
     log_level: str = "INFO"
 
     @property
