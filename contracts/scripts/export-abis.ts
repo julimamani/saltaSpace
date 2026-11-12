@@ -7,7 +7,7 @@ import path from 'node:path';
  *   backend/app/chain/abi/*.json + backend/app/chain/deployments/*.json
  * Run after `hardhat compile` (done automatically by scripts/deploy.ts).
  */
-const CONTRACTS = ['MockUSDC', 'LotToken', 'LotFactory', 'OracleConsumer', 'CampaignVault'];
+const CONTRACTS = ['MockUSDC', 'LotToken', 'LotFactory', 'OracleConsumer', 'CampaignVault', 'InvestorRegistry'];
 const ROOT = path.join(__dirname, '..');
 const REPO = path.join(ROOT, '..');
 
@@ -45,7 +45,9 @@ export function exportArtifacts() {
   startBlock: number;
   deployer: string;
   oracle: string;
-  contracts: { MockUSDC: \`0x\${string}\`; OracleConsumer: \`0x\${string}\`; LotFactory: \`0x\${string}\`; CampaignVault: \`0x\${string}\` };
+  /** false when the deployment points to a real stablecoin (USDC_ADDRESS) instead of MockUSDC. */
+  usdcIsMock?: boolean;
+  contracts: { MockUSDC: \`0x\${string}\`; OracleConsumer: \`0x\${string}\`; InvestorRegistry: \`0x\${string}\`; LotFactory: \`0x\${string}\`; CampaignVault: \`0x\${string}\` };
   deployedAt: string;
 }
 
