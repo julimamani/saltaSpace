@@ -27,5 +27,21 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
       "CampaignVault": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
     "deployedAt": "2026-11-12T17:00:10.575Z"
+  },
+  "500301": {
+    "network": "l1",
+    "chainId": 500301,
+    "startBlock": 0,
+    "deployer": "0x4cD2079B00eB41f8B4f5ddEEE7e48cce9f16A4Aa",
+    "oracle": "0x4cD2079B00eB41f8B4f5ddEEE7e48cce9f16A4Aa",
+    "usdcIsMock": true,
+    "contracts": {
+      "MockUSDC": "0x95b7Ea65dc27A494608E57f7Bf3C62bC454a43a5",
+      "OracleConsumer": "0x5060ca94F6e94A0C3DB359d83adeB0Da4E79989C",
+      "InvestorRegistry": "0xc5063a48CBEcEA9079927ACc0e1ad5063bd85fbE",
+      "LotFactory": "0x37C587452f907d9a35991719f7D17F2572A13e60",
+      "CampaignVault": "0xb73786e8a742e3BBFE9b270a19a168C3d1445f8d"
+    },
+    "deployedAt": "2026-11-12T19:22:21.342Z"
   }
 };
