@@ -171,7 +171,8 @@ class Chain:
             ts = max(min(int(time.time()), block_ts + 600), last_ts + 1)
             metrics = (
                 clamp(round(ndvi * 10_000), -10_000, 10_000),
-                clamp(round((ndwi if ndwi is not None else 0.0) * 10_000), -10_000, 10_000),
+                # No SWIR data: publish the trigger threshold itself so the strict "<" never fires without evidence.
+                clamp(round((ndwi if ndwi is not None else self.s.ndwi_trigger) * 10_000), -10_000, 10_000),
                 clamp(int(risk_score), 0, 100),
                 clamp(round(yield_index * 10_000), 5_000, 13_000),
                 clamp(round(water_balance_mm), -2_000_000_000, 2_000_000_000),
