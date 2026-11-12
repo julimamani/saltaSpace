@@ -104,6 +104,7 @@ contract CampaignVault is AccessControl, ReentrancyGuard, Pausable {
     error InvalidInsuranceParams();
     error InsuranceNotTriggered(uint256 lotId);
     error InsuranceAlreadyExecuted(uint256 lotId);
+    error InsurancePoolEmpty();
 
     event Invested(uint256 indexed lotId, address indexed investor, uint256 tokens, uint256 cost);
     event GoalReachedEvent(uint256 indexed lotId, uint256 raised);
@@ -127,6 +128,7 @@ contract CampaignVault is AccessControl, ReentrancyGuard, Pausable {
     event InsuranceParamsUpdated(InsuranceParams params);
     event InsurancePremiumCollected(uint256 indexed lotId, uint256 amount);
     event InsurancePoolFunded(address indexed from, uint256 amount);
+    event InsuranceCoverageReturned(uint256 indexed lotId, uint256 amount);
     event InsuranceExecuted(
         uint256 indexed lotId,
         uint256 coverage,
@@ -286,6 +288,7 @@ contract CampaignVault is AccessControl, ReentrancyGuard, Pausable {
         if (!oracle.hasMetrics(lotId)) revert NoMetrics(lotId);
         OracleConsumer.Metrics memory m = oracle.latestMetrics(lotId);
         if (!_triggered(m)) revert InsuranceNotTriggered(lotId);
+        if (insurancePool == 0) revert InsurancePoolEmpty();
         _executeInsurance(lotId, t, s, m);
     }
 
@@ -334,7 +337,8 @@ contract CampaignVault is AccessControl, ReentrancyGuard, Pausable {
 
         OracleConsumer.Metrics memory m = oracle.latestMetrics(lotId);
         (uint16 multiplierBps, bool drought) = _payoutMultiplier(t.targetApyBps, m);
-        if (!_insurance[lotId].executed && _triggered(m)) _executeInsurance(lotId, t, s, m);
+        // Auto-execute the coverage; with an empty pool the lot stays claimable once it is funded.
+        if (!_insurance[lotId].executed && insurancePool > 0 && _triggered(m)) _executeInsurance(lotId, t, s, m);
 
         // If funds were never released, the raised capital is still here and backs the payout.
         uint256 available = s.repaid + _insurance[lotId].coverage + (s.fundsReleased ? 0 : s.raised);
@@ -353,8 +357,19 @@ contract CampaignVault is AccessControl, ReentrancyGuard, Pausable {
 
         uint256 surplus = available - payoutPerToken * s.tokensSold;
         if (surplus > 0) {
-            usdc.safeTransfer(t.producer, surplus);
-            emit SurplusReturned(lotId, t.producer, surplus);
+            // Unused coverage goes back to the pool first; only producer money is a producer surplus.
+            LotInsurance storage ins = _insurance[lotId];
+            uint256 back = surplus > ins.coverage ? ins.coverage : surplus;
+            if (back > 0) {
+                insurancePool += back;
+                ins.coverage -= back;
+                surplus -= back;
+                emit InsuranceCoverageReturned(lotId, back);
+            }
+            if (surplus > 0) {
+                usdc.safeTransfer(t.producer, surplus);
+                emit SurplusReturned(lotId, t.producer, surplus);
+            }
         }
     }
 

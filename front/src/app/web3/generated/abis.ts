@@ -2204,6 +2204,11 @@ export const CampaignVaultAbi = [
   },
   {
     "inputs": [],
+    "name": "InsurancePoolEmpty",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidInsuranceParams",
     "type": "error"
   },
@@ -2379,6 +2384,25 @@ export const CampaignVaultAbi = [
       }
     ],
     "name": "GoalReachedEvent",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsuranceCoverageReturned",
     "type": "event"
   },
   {

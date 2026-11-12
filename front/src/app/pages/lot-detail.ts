@@ -30,6 +30,7 @@ const EVENT_LABEL: Record<string, string> = {
   InsurancePremiumCollected: 'Seguro: prima al pool',
   InsurancePoolFunded: 'Seguro: aporte al pool',
   InsuranceExecuted: 'Seguro paramétrico ejecutado',
+  InsuranceCoverageReturned: 'Seguro: cobertura no usada vuelve al pool',
 };
 
 const CONDITION_LABEL: Record<string, string> = {
@@ -267,6 +268,7 @@ export class LotDetail implements OnDestroy {
         return `NDVI ${(m.ndvi / 10_000).toFixed(3)} · NDWI ${(m.ndwi / 10_000).toFixed(3)} · riesgo ${m.riskScore} · yield ${(m.yieldIndexBps / 10_000).toFixed(3)} · balance ${m.waterBalanceMm} mm · ${m.criticalDryDays} días críticos`;
       }
       case 'InsurancePremiumCollected': return `${u('amount')} USDC de prima (3% del capital) al pool`;
+      case 'InsuranceCoverageReturned': return `${u('amount')} USDC devueltos al pool`;
       case 'InsurancePoolFunded': return `${shortAddr(a['from'] as string)} aportó ${u('amount')} USDC al pool`;
       case 'InsuranceExecuted': return `Cobertura ${u('coverage')} USDC · NDWI ${(Number(a['ndwi']) / 10_000).toFixed(3)} · lluvia ${(Number(a['rainVsNormalBps']) / 100).toFixed(0)}% del histórico · ${a['criticalDryDays']} días críticos`;
       case 'LotCreated': return `${a['name']} (${a['crop']})`;

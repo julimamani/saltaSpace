@@ -250,6 +250,29 @@ describe('CampaignVault', () => {
       expect(await f.vault.insurancePool()).to.equal(USDC(830));
     });
 
+    it('unused coverage returns to the pool at settlement instead of leaking to the producer', async () => {
+      const f = await loadFixture(fundedFixture);
+      await f.vault.connect(f.stranger).fundInsurancePool(USDC(1_000));
+      // Funds never released: the 1,000 USDC capital still backs the payout, plus 200 of coverage.
+      await pushMetrics(f, 4_000, 60, 8_000, TRIGGER);
+      await f.vault.connect(f.stranger).executeInsurance(0);
+      expect(await f.vault.insurancePool()).to.equal(USDC(800));
+      // multiplier 1 + 0.18 * 0.8 = 1.144 -> owed 1,144; available 1,200 -> 56 unused coverage.
+      await expect(f.vault.settle(0)).to.emit(f.vault, 'InsuranceCoverageReturned').withArgs(0, USDC(56)).and.not.to.emit(f.vault, 'SurplusReturned');
+      expect(await f.vault.insurancePool()).to.equal(USDC(856));
+      expect((await f.vault.getLotInsurance(0)).coverage).to.equal(USDC(144));
+    });
+
+    it('does not burn the coverage right on an empty pool', async () => {
+      const f = await loadFixture(fundedFixture);
+      await pushMetrics(f, 4_000, 60, 8_000, TRIGGER);
+      await expect(f.vault.executeInsurance(0)).to.be.revertedWithCustomError(f.vault, 'InsurancePoolEmpty');
+      expect((await f.vault.getLotInsurance(0)).executed).to.equal(false);
+      await f.vault.connect(f.stranger).fundInsurancePool(USDC(50));
+      await f.vault.executeInsurance(0);
+      expect((await f.vault.getLotInsurance(0)).coverage).to.equal(USDC(50));
+    });
+
     it('also triggers on an NDVI collapse or prolonged dry soil on radar, on their own', async () => {
       const f = await loadFixture(fundedFixture);
       await pushMetrics(f, 3_500, 70, 7_000, { ndviDropBps: 4_500 });
