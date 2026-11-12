@@ -10,6 +10,7 @@ import { USDC_DECIMALS } from '../core/config';
 import type { AnalysisResult, PolygonGeometry } from '../core/models';
 import { pct, polygonAreaHa, riskLabel, shortDate } from '../core/format';
 import { LotMap } from '../shared/lot-map';
+import { parseLatLon, parseVertices, squareAround, type LatLon } from '../core/geo';
 import { LineChart, type ChartSeries } from '../shared/line-chart';
 import { LotFactoryAbi } from '../web3/generated/abis';
 
@@ -27,14 +28,55 @@ const SAMPLE: PolygonGeometry = {
   imports: [FormsModule, RouterLink, LotMap, LineChart],
   template: `
     <h1 class="text-3xl font-bold text-stone-900">Registrar lote</h1>
-    <p class="mb-6 text-stone-600">Dibujá el lote, analizalo con datos satelitales reales y publicá la campaña on-chain.</p>
+    <p class="mb-6 text-stone-600">Ubicá tu finca, analizala con datos satelitales reales y publicá la campaña on-chain.</p>
 
     <div class="grid gap-6 lg:grid-cols-5">
       <div class="space-y-4 lg:col-span-3">
-        <app-lot-map [geometry]="geometry()" [editable]="true" height="26rem" (geometryChange)="onGeometry($event)" />
+        <section class="card space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="card-title">Ubicá la finca a tokenizar</h2>
+            @if (geometry()) { <span class="chip !bg-emerald-100 !text-emerald-900">✓ Polígono listo · {{ areaHa().toFixed(1) }} ha</span> }
+          </div>
+          <div role="tablist" aria-label="Cómo definir el lote" class="inline-flex flex-wrap rounded-xl bg-stone-100 p-1">
+            @for (m of modes; track m.id) {
+              <button type="button" role="tab" [attr.aria-selected]="mode() === m.id" (click)="mode.set(m.id)"
+                class="rounded-lg px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                [class]="mode() === m.id ? 'bg-white text-emerald-900 shadow-sm' : 'text-stone-500 hover:text-stone-800'">{{ m.label }}</button>
+            }
+          </div>
+
+          @switch (mode()) {
+            @case ('draw') {
+              <p class="text-xs text-stone-500">Hacé clic en el mapa sobre cada esquina del lote y después “Cerrar polígono”. Tip: buscá primero tu finca con “Ir a coordenada”.</p>
+              <form class="flex flex-wrap items-end gap-2" (ngSubmit)="goTo()">
+                <div class="min-w-56 flex-1">
+                  <label class="label" for="goto">Ir a coordenada (latitud, longitud)</label>
+                  <input id="goto" name="goto" class="input" placeholder="-25.8136, -64.9703" [(ngModel)]="coords.point" />
+                </div>
+                <button type="submit" class="btn-ghost">Ir</button>
+              </form>
+            }
+            @case ('vertices') {
+              <p class="text-xs text-stone-500">Pegá las esquinas del lote, una por línea, en el orden del perímetro. Acepta decimal (<code>-25.8102, -64.9745</code>) o grados (<code>25°48'36"S 64°58'28"O</code>), como las copiás de Google Maps o del GPS.</p>
+              <textarea name="vertices" rows="5" class="input font-mono text-xs" [(ngModel)]="coords.vertices"
+                placeholder="-25.8102, -64.9745&#10;-25.8102, -64.9662&#10;-25.8171, -64.9662&#10;-25.8171, -64.9745"></textarea>
+              <button type="button" class="btn-primary" (click)="applyVertices()">Crear polígono con estas coordenadas</button>
+            }
+            @case ('center') {
+              <p class="text-xs text-stone-500">¿Solo tenés la ubicación de la finca? Ingresá el punto central y la superficie: armamos un lote cuadrado que después podés ajustar dibujando.</p>
+              <div class="grid gap-2 sm:grid-cols-3">
+                <div class="sm:col-span-2"><label class="label" for="center">Punto central (latitud, longitud)</label><input id="center" name="center" class="input" placeholder="-25.8136, -64.9703" [(ngModel)]="coords.point" /></div>
+                <div><label class="label" for="centerHa">Superficie (ha)</label><input id="centerHa" name="centerHa" type="number" min="1" step="1" class="input" [(ngModel)]="coords.hectares" /></div>
+              </div>
+              <button type="button" class="btn-primary" (click)="applyCenter()">Crear lote alrededor del punto</button>
+            }
+          }
+          @if (coordError()) { <div class="alert-error">{{ coordError() }}</div> }
+        </section>
+
+        <app-lot-map [geometry]="geometry()" [focus]="focus()" [editable]="true" height="26rem" (geometryChange)="onGeometry($event)" />
         <div class="flex flex-wrap items-center gap-2 text-sm">
           <button class="btn-ghost" (click)="useSample()">Usar lote de ejemplo (Rosario de la Frontera)</button>
-          @if (geometry()) { <span class="chip">Superficie ≈ {{ areaHa().toFixed(1) }} ha</span> }
         </div>
 
         <section class="card">
@@ -86,13 +128,33 @@ const SAMPLE: PolygonGeometry = {
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="label" for="ha">Hectáreas</label><input id="ha" name="ha" type="number" step="0.01" min="0.01" class="input" [(ngModel)]="f.hectares" /></div>
-          <div><label class="label" for="apy">APY objetivo (%)</label><input id="apy" name="apy" type="number" step="0.5" min="0.5" max="100" class="input" [(ngModel)]="f.apy" /></div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div><label class="label" for="goal">Meta (USDC)</label><input id="goal" name="goal" type="number" step="10" min="10" class="input" [(ngModel)]="f.goal" /></div>
+          <div><label class="label" for="apy">APY objetivo (% anual)</label><input id="apy" name="apy" type="number" step="0.5" min="0.5" max="100" class="input" [(ngModel)]="f.apy" /></div>
           <div><label class="label" for="price">Precio token (USDC)</label><input id="price" name="price" type="number" step="1" min="10" class="input" [(ngModel)]="f.price" /></div>
         </div>
+        <fieldset class="rounded-xl border border-stone-200 p-3">
+          <legend class="px-1 text-xs font-semibold text-stone-600">Superficie a tokenizar</legend>
+          <label class="label" for="ha">Cantidad de hectáreas (número, no porcentaje)</label>
+          <div class="relative">
+            <input id="ha" name="ha" type="number" step="0.01" min="0.01" class="input pr-12" [(ngModel)]="f.hectares" aria-describedby="ha-help" />
+            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-stone-400">ha</span>
+          </div>
+          @if (areaHa() > 0) {
+            <div class="mt-2 flex flex-wrap gap-1" role="group" aria-label="Porcentaje del polígono">
+              @for (p of sharePresets; track p) {
+                <button type="button" class="rounded-lg border px-2 py-1 text-xs font-semibold transition"
+                  [class]="isShare(p) ? 'border-emerald-600 bg-emerald-50 text-emerald-900' : 'border-stone-200 text-stone-600 hover:border-stone-300'"
+                  (click)="setShare(p)">{{ p }}%</button>
+              }
+            </div>
+            <p id="ha-help" class="mt-2 text-xs text-stone-500">
+              El polígono mide <b>{{ areaHa().toFixed(1) }} ha</b>. Tokenizás <b>{{ f.hectares || 0 }} ha</b> =
+              <b [class.text-red-700]="sharePct() > 100">{{ sharePct().toFixed(0) }}%</b> de la finca dibujada.
+            </p>
+          } @else {
+            <p id="ha-help" class="mt-2 text-xs text-stone-500">Ubicá la finca primero: calculamos la superficie del polígono y la cargamos acá.</p>
+          }
+        </fieldset>
+        <div><label class="label" for="goal">Meta de financiamiento (USDC)</label><input id="goal" name="goal" type="number" step="10" min="10" class="input" [(ngModel)]="f.goal" /></div>
         <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="demo" [(ngModel)]="f.demoTimes" /> Plazos cortos para demo (minutos)</label>
         <div class="grid grid-cols-2 gap-3">
           <div><label class="label" for="dl">Cierre en ({{ f.demoTimes ? 'min' : 'días' }})</label><input id="dl" name="dl" type="number" min="1" class="input" [(ngModel)]="f.deadline" /></div>
@@ -128,6 +190,16 @@ export class Producer {
   protected readonly analysisError = signal<string | null>(null);
   protected readonly creating = signal(false);
   protected readonly formError = signal<string | null>(null);
+  protected readonly mode = signal<'draw' | 'vertices' | 'center'>('draw');
+  protected readonly focus = signal<LatLon | null>(null);
+  protected readonly coordError = signal<string | null>(null);
+  protected readonly modes = [
+    { id: 'draw' as const, label: 'Dibujar en el mapa' },
+    { id: 'vertices' as const, label: 'Coordenadas de las esquinas' },
+    { id: 'center' as const, label: 'Punto central + hectáreas' },
+  ];
+  protected readonly sharePresets = [25, 50, 75, 100];
+  protected coords = { point: '', vertices: '', hectares: 100 };
 
   protected f = {
     name: 'Porotos La Candelaria',
@@ -165,6 +237,43 @@ export class Producer {
     return Number.isInteger(n) ? `${n} tokens de ${this.f.price} USDC · retorno objetivo ${pct(this.f.apy / 100)} ajustado por NDVI/clima.` : 'La meta debe ser múltiplo del precio del token.';
   }
 
+  protected sharePct(): number {
+    const a = this.areaHa();
+    return a > 0 ? ((this.f.hectares || 0) / a) * 100 : 0;
+  }
+
+  protected isShare(p: number): boolean {
+    return Math.abs(this.sharePct() - p) < 0.5;
+  }
+
+  protected setShare(p: number): void {
+    this.f.hectares = +((this.areaHa() * p) / 100).toFixed(2);
+  }
+
+  protected goTo(): void {
+    const p = parseLatLon(this.coords.point);
+    if (!p) return this.coordError.set('Coordenada inválida. Usá "latitud, longitud", p. ej. -25.8136, -64.9703.');
+    this.coordError.set(null);
+    this.focus.set(p);
+  }
+
+  protected applyVertices(): void {
+    const r = parseVertices(this.coords.vertices);
+    if ('error' in r) return this.coordError.set(r.error);
+    this.coordError.set(null);
+    this.focus.set(null);
+    this.onGeometry(r.geometry);
+  }
+
+  protected applyCenter(): void {
+    const p = parseLatLon(this.coords.point);
+    if (!p) return this.coordError.set('Coordenada inválida. Usá "latitud, longitud", p. ej. -25.8136, -64.9703.');
+    if (!(this.coords.hectares > 0) || this.coords.hectares > 100_000) return this.coordError.set('Indicá una superficie entre 1 y 100.000 ha.');
+    this.coordError.set(null);
+    this.focus.set(p);
+    this.onGeometry(squareAround(p, this.coords.hectares));
+  }
+
   protected onGeometry(g: PolygonGeometry | null): void {
     this.geometry.set(g);
     this.analysis.set(null);
@@ -198,7 +307,8 @@ export class Producer {
     if (f.goal % f.price !== 0) return this.formError.set('La meta debe ser múltiplo del precio del token.');
     if (f.price < 10) return this.formError.set('El precio mínimo por token es 10 USDC.');
     if (+f.maturity <= +f.deadline) return this.formError.set('La cosecha debe ser posterior al cierre de la campaña.');
-    if (!f.hectares || f.hectares <= 0) return this.formError.set('Indicá las hectáreas.');
+    if (!f.hectares || f.hectares <= 0) return this.formError.set('Indicá la cantidad de hectáreas a tokenizar.');
+    if (f.hectares > this.areaHa() * 1.01) return this.formError.set(`Las hectáreas (${f.hectares}) superan la superficie del polígono (${this.areaHa().toFixed(1)} ha).`);
     this.creating.set(true);
     try {
       const now = await this.lots.refreshChainTime();
