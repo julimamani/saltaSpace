@@ -1,6 +1,6 @@
 # AgroToken · saltaSpace
 
-> **Prototipo educativo / testnet.** Los lotes y tokens son **simulados**; no hay tokenización legal, oferta pública ni valor real. Solo Avalanche Fuji / red local.
+> **Prototipo MVP.** Los lotes y tokens son **simulados**; no hay tokenización legal, oferta pública ni valor real. Solo Avalanche Fuji / red local.
 
 AgroToken es un prototipo de hackathon (48 h) de tokenización B2B de activos agrícolas (RWA) del norte argentino sobre **Avalanche**. El activo es simulado, pero su comportamiento financiero depende de **datos reales**: NDVI de Sentinel‑2 y clima de Open‑Meteo / NASA POWER.
 
