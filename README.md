@@ -51,7 +51,7 @@ flowchart LR
 | `contracts/` | Solidity 0.8.24 + Hardhat TS + OpenZeppelin v5: `MockUSDC`, `LotFactory`, `LotToken` (clones EIP‑1167), `CampaignVault`, `OracleConsumer`. Tests, deploy, seed y export de ABIs. |
 | `backend/` | Python 3.11, FastAPI, pystac-client, rasterio/numpy, httpx, web3.py, APScheduler. |
 | `front/` | Angular 21 standalone + SSR, Tailwind v4, viem, Leaflet, Chart.js. |
-| `docs/` | [Fórmulas](docs/scoring.md), [seguro paramétrico](docs/seguro-parametrico.md), [deploy en Fuji](docs/deploy-fuji.md), [deploy en una L1](docs/deploy-l1.md), [guion de demo](docs/demo-script.md). |
+| `docs/` | [Fórmulas](docs/scoring.md), [seguro paramétrico](docs/seguro-parametrico.md), [deploy en Fuji](docs/deploy-fuji.md), [deploy en una L1](docs/deploy-l1.md), [propuesta MVP y de negocio](docs/propuesta-mvp.md), [guion de demo](docs/demo-script.md). |
 
 ### Contratos
 
