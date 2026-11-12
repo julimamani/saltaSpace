@@ -111,9 +111,10 @@ def analyze(
         series, w, sar = cached[1]
     else:
         lon, lat = ndvi_svc.centroid_of(geometry)
-        series = ndvi_svc.get_ndvi_series(geometry, start, end, s)
+        # Satellite series over the whole season too, so `ndvi_drop` sees the real season peak.
+        series = ndvi_svc.get_ndvi_series(geometry, w_start, end, s)
         cloudy = (series[-1].cloud_cover or 0) > s.cloud_priority_threshold or series[-1].source == "mock"
-        sar = sar_svc.get_sar(geometry, start, end, s, prioritized=cloudy)
+        sar = sar_svc.get_sar(geometry, w_start, end, s, prioritized=cloudy)
         w = weather.get_weather(lat, lon, w_start, end, s)
         _cache[key] = (time.time(), (series, w, sar))
 
