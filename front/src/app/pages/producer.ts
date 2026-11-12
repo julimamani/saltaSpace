@@ -13,7 +13,7 @@ import { LotMap } from '../shared/lot-map';
 import { LineChart, type ChartSeries } from '../shared/line-chart';
 import { LotFactoryAbi } from '../web3/generated/abis';
 
-const CROPS = ['Soja', 'Maíz', 'Poroto', 'Trigo', 'Caña de azúcar', 'Tabaco', 'Citrus', 'Vid'];
+const CROPS = ['Soja', 'Maíz', 'Poroto', 'Garbanzos', 'Lentejas', 'Chia','Quinoa','Caña de azúcar', 'Tabaco' ];
 const ISO = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Example polygon: bean field near Rosario de la Frontera (Salta). */
