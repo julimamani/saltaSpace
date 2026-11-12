@@ -18,15 +18,17 @@ flowchart LR
     W[viem + Core/MetaMask]
   end
   subgraph API["Backend FastAPI (backend/)"]
-    AN[Análisis NDVI + clima]
-    SC[Scoring agro-score-v1]
+    AN[Sentinel-2 NDVI/EVI/NDWI/LAI + Sentinel-1 SAR + clima]
+    WB[Balance hídrico FAO-56 Penman-Monteith × Kc]
+    SC[Scoring agro-score-v2 + trigger paramétrico]
     OR[Oráculo + scheduler]
     DB[(SQLite: historial)]
   end
   subgraph Data["Datos públicos"]
     S2[Earth Search STAC · Sentinel-2 L2A COG]
+    S1[Planetary Computer · Sentinel-1 RTC]
     OM[Open-Meteo]
-    NP[NASA POWER]
+    NP[NASA POWER + climatología]
   end
   subgraph Chain["Avalanche Fuji C-Chain (43113) / Hardhat (31337)"]
     F[LotFactory] -->|clona| T[LotToken ERC-20 por lote]
@@ -35,12 +37,12 @@ flowchart LR
     U[MockUSDC]
   end
   UI -->|POST /lots/analyze, /demo| API
-  W -->|invest / claim / refund / settle| V
+  W -->|invest / claim / refund / settle / executeInsurance| V
   W -->|createLot| F
   W -->|faucet / approve| U
   UI -->|lecturas + eventos| Chain
-  AN --> S2 & OM & NP
-  AN --> SC --> OR -->|updateLotMetrics ORACLE_ROLE| O
+  AN --> S2 & S1 & OM & NP
+  AN --> WB --> SC --> OR -->|updateLotMetrics ORACLE_ROLE| O
   OR --> DB
 ```
 
@@ -49,28 +51,42 @@ flowchart LR
 | `contracts/` | Solidity 0.8.24 + Hardhat TS + OpenZeppelin v5: `MockUSDC`, `LotFactory`, `LotToken` (clones EIP‑1167), `CampaignVault`, `OracleConsumer`. Tests, deploy, seed y export de ABIs. |
 | `backend/` | Python 3.11, FastAPI, pystac-client, rasterio/numpy, httpx, web3.py, APScheduler. |
 | `front/` | Angular 21 standalone + SSR, Tailwind v4, viem, Leaflet, Chart.js. |
-| `docs/` | [Fórmulas](docs/scoring.md), [deploy en Fuji](docs/deploy-fuji.md), [deploy en una L1](docs/deploy-l1.md), [guion de demo](docs/demo-script.md). |
+| `docs/` | [Fórmulas](docs/scoring.md), [seguro paramétrico](docs/seguro-parametrico.md), [deploy en Fuji](docs/deploy-fuji.md), [deploy en una L1](docs/deploy-l1.md), [guion de demo](docs/demo-script.md). |
 
 ### Contratos
 
 - **`LotFactory`**: crea lotes (productor, nombre, cultivo, hectáreas, GeoJSON + `geoHash`, meta, precio por token, cierre, madurez, APY objetivo) y clona un `LotToken` por lote.
 - **`InvestorRegistry`**: allowlist KYC/AML compartida por todos los `LotToken`. Solo wallets verificadas (`COMPLIANCE_ROLE`) pueden **recibir** tokens — al invertir y en transferencias secundarias. Quemar (claim/refund) nunca se restringe.
-- **`CampaignVault`**: `invest`, `releaseFundsToProducer`, `refund`, `depositRepayment`, `settle`, `claim`. Estados `Funding → Funded → Settled` o `Funding → Failed`. `ReentrancyGuard`, `Pausable`, `SafeERC20`, `AccessControl`, errores custom y eventos en cada acción.
-- **`OracleConsumer`**: `ORACLE_ROLE` publica `updateLotMetrics(lotId, ndvi, riskScore, yieldIndex, timestamp, dataHash)`; el historial completo queda en eventos `MetricsUpdated`.
-- **Pago**: `pricePerToken × clamp(1 + APY × yieldIndex − haircut_sequía, 0.8, 1.3)`, pro‑rata si el repago no alcanza. Ver [docs/scoring.md](docs/scoring.md).
+- **`CampaignVault`**: `invest`, `releaseFundsToProducer`, `refund`, `depositRepayment`, `settle`, `claim` + seguro paramétrico: `fundInsurancePool`, `executeInsurance`, `insuranceTrigger`, `getLotInsurance`. Estados `Funding → Funded → Settled` o `Funding → Failed`. `ReentrancyGuard`, `Pausable`, `SafeERC20`, `AccessControl`, errores custom y eventos en cada acción.
+- **`OracleConsumer`**: `ORACLE_ROLE` publica `updateLotMetrics(lotId, Metrics)` con `ndvi`, `ndwi`, `riskScore`, `yieldIndexBps`, `waterBalanceMm`, `criticalDryDays`, `rainVsNormalBps`, `ndviDropBps`, `soilDryDays`, `timestamp`, `dataHash`; el historial completo queda en eventos `MetricsUpdated`.
+- **Pago**: `pricePerToken × clamp(1 + APY × yieldIndex − haircut_sequía, 0.8, 1.3)`; hay sequía si `NDVI < 0.30` **o** `criticalDryDays ≥ 10` (días de floración con balance hídrico negativo). Pro‑rata si el repago + cobertura no alcanza. Ver [docs/scoring.md](docs/scoring.md).
+- **Seguro paramétrico** (ver [docs/seguro-parametrico.md](docs/seguro-parametrico.md)): al liberar fondos, el 3% del capital queda en `insurancePool`. El contrato evalúa el trigger con las métricas del oráculo —`(NDWI < 0.05 y (lluvia < 50% del histórico o ≥ 10 días críticos con balance < 0)) o NDVI cae ≥ 40% o suelo seco en radar ≥ 21 días`— y cualquiera puede llamar `executeInsurance` (o lo hace `settle()` solo): el pool paga el 20% del capital del lote a los inversores. Sin peritos, sin formularios.
 
 ### API
 
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health` | Estado, red y contratos. |
-| POST | `/lots/analyze` | `{geometry, start_date?, end_date?}` → NDVI (serie + último), clima, `risk_score`, `yield_index`, `data_hash`. |
-| GET | `/lots` | Lotes on-chain con estado, métricas y pago estimado. |
+| POST | `/lots/analyze` | `{geometry, start_date?, end_date?, crop?, sowing_date?, harvest_date?}` → serie semanal Sentinel‑2 (NDVI/EVI/NDWI/LAI), radar Sentinel‑1 (VV/VH/RVI, días de suelo seco), clima + ET0 Penman‑Monteith, balance hídrico (ETc, días críticos, lluvia vs histórico), `risk_score`, `yield_index`, evaluación del seguro, `data_hash`. |
+| GET | `/lots` | Lotes on-chain con estado, métricas, pago estimado y seguro (pool, trigger, cobertura). |
 | GET | `/lots/{id}/metrics` | Historial de publicaciones del oráculo + último análisis. |
+| GET | `/lots/{id}/seguro` | `{"riesgo_hidrico": "ALTO", "riesgo_climatico": "ALTO", "trigger_seguro": true, "condiciones": {...}, "motivos": [...]}` + vista on-chain del vault. `?refresh=true` recalcula con datos en vivo. |
+| PUT | `/lots/{id}/profile` | Fecha de siembra del lote (define la curva Kc y la ventana de floración). |
 | POST | `/oracle/push/{id}` | Analiza el polígono guardado on-chain y publica métricas. |
 | GET/POST | `/demo/scenario/{id}` | Fuerza `drought` / `excellent` / `real` y publica al instante. |
 
 Docs interactivas en http://localhost:8000/docs.
+
+### Oráculo multifuente y seguro paramétrico
+
+> *"En las finanzas tradicionales, si un productor pierde su cosecha por sequía, un perito debe viajar al lote, evaluar el daño (subjetivo) y el seguro tarda meses en pagar. AgroToken resuelve esto con un seguro paramétrico embebido en el token: el oráculo mide, el contrato paga."*
+
+1. **ET0 FAO‑56 Penman‑Monteith** (`backend/app/services/et0.py`): temperatura mín/máx, radiación, humedad y viento diarios de Open‑Meteo (NASA POWER como respaldo). El ET0 propio se compara con el de Open‑Meteo (`et0_ref_mm`, diferencia < 5%).
+2. **ETc = ET0 × Kc** (`crops.py`): coeficientes y duración de etapas FAO‑56 para soja, maíz, poroto, tabaco, trigo y caña. La etapa media es la floración.
+3. **Balance hídrico** (`hydro.py`): lluvia − ETc día a día sobre un balde de suelo (TAW/RAW). Los días de floración con la reserva agotada son los *días críticos*. La lluvia de campaña se compara con la climatología 2001‑2025 de NASA POWER.
+4. **Sentinel‑2 multiíndice** (`ndvi.py`): mejor escena por semana; NDVI, **EVI** (corrige suelo/atmósfera), **NDWI (B08‑B11)** (agua en hoja: detecta estrés antes de que la planta amarillee) y **LAI** estimado.
+5. **Sentinel‑1 radar** (`sar.py`, Planetary Computer): retrodispersión VV/VH y RVI; atraviesa nubes. Si la mejor escena óptica tiene > 20% de nubes, el radar manda en la lectura de humedad de suelo.
+6. **Trigger** (`insurance.py` ↔ `CampaignVault._triggered`): la misma regla off‑chain (para explicarla en la UI) y on‑chain (para pagar). `Riesgo hídrico = ALTO` si lluvia < ETc y NDWI < umbral.
 
 ## Requisitos
 
@@ -86,7 +102,7 @@ docker compose up --build
 ```
 
 - Front: http://localhost:4000 · API: http://localhost:8000/docs · RPC Hardhat: http://localhost:8545 (chainId 31337)
-- Se despliegan los contratos, se crean 2 lotes de ejemplo (Porotos en Rosario de la Frontera y Maíz en Valle de Lerma) y el oráculo publica datos reales al arrancar y cada 30 min.
+- Se despliegan los contratos, se crean 2 lotes de ejemplo (Porotos en Rosario de la Frontera y Maíz en Valle de Lerma), se siembra el pool de seguro con 2.000 USDC y el oráculo publica datos reales al arrancar y cada 30 min.
 - En la wallet agregá la red `http://localhost:8545`, chainId `31337`, e importá la cuenta de Hardhat **#0** (`0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`). Es una clave de desarrollo **pública**: tiene ETH local, es el admin (`SETTLER_ROLE`, puede liquidar antes de la madurez) y el productor de los lotes de ejemplo. Nunca la uses en otra red.
 - Si reiniciás el nodo Hardhat, reseteá la actividad de la cuenta en la wallet (nonce).
 

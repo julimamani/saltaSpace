@@ -1510,6 +1510,28 @@ export const OracleConsumerAbi = [
   {
     "inputs": [
       {
+        "internalType": "uint16",
+        "name": "ndviDropBps",
+        "type": "uint16"
+      }
+    ],
+    "name": "InvalidNdviDrop",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "int16",
+        "name": "ndwi",
+        "type": "int16"
+      }
+    ],
+    "name": "InvalidNdwi",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint8",
         "name": "riskScore",
         "type": "uint8"
@@ -1555,34 +1577,67 @@ export const OracleConsumerAbi = [
         "type": "uint256"
       },
       {
+        "components": [
+          {
+            "internalType": "int16",
+            "name": "ndvi",
+            "type": "int16"
+          },
+          {
+            "internalType": "int16",
+            "name": "ndwi",
+            "type": "int16"
+          },
+          {
+            "internalType": "uint8",
+            "name": "riskScore",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint16",
+            "name": "yieldIndexBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int32",
+            "name": "waterBalanceMm",
+            "type": "int32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainVsNormalBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timestamp",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "dataHash",
+            "type": "bytes32"
+          }
+        ],
         "indexed": false,
-        "internalType": "int16",
-        "name": "ndvi",
-        "type": "int16"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "riskScore",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint16",
-        "name": "yieldIndexBps",
-        "type": "uint16"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "timestamp",
-        "type": "uint64"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "dataHash",
-        "type": "bytes32"
+        "internalType": "struct OracleConsumer.Metrics",
+        "name": "metrics",
+        "type": "tuple"
       },
       {
         "indexed": true,
@@ -1845,6 +1900,11 @@ export const OracleConsumerAbi = [
             "type": "int16"
           },
           {
+            "internalType": "int16",
+            "name": "ndwi",
+            "type": "int16"
+          },
+          {
             "internalType": "uint8",
             "name": "riskScore",
             "type": "uint8"
@@ -1852,6 +1912,31 @@ export const OracleConsumerAbi = [
           {
             "internalType": "uint16",
             "name": "yieldIndexBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int32",
+            "name": "waterBalanceMm",
+            "type": "int32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainVsNormalBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDays",
             "type": "uint16"
           },
           {
@@ -1955,29 +2040,66 @@ export const OracleConsumerAbi = [
         "type": "uint256"
       },
       {
-        "internalType": "int16",
-        "name": "ndvi",
-        "type": "int16"
-      },
-      {
-        "internalType": "uint8",
-        "name": "riskScore",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint16",
-        "name": "yieldIndexBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint64",
-        "name": "timestamp",
-        "type": "uint64"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "dataHash",
-        "type": "bytes32"
+        "components": [
+          {
+            "internalType": "int16",
+            "name": "ndvi",
+            "type": "int16"
+          },
+          {
+            "internalType": "int16",
+            "name": "ndwi",
+            "type": "int16"
+          },
+          {
+            "internalType": "uint8",
+            "name": "riskScore",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint16",
+            "name": "yieldIndexBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int32",
+            "name": "waterBalanceMm",
+            "type": "int32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainVsNormalBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timestamp",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "dataHash",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct OracleConsumer.Metrics",
+        "name": "m",
+        "type": "tuple"
       }
     ],
     "name": "updateLotMetrics",
@@ -2103,6 +2225,38 @@ export const CampaignVaultAbi = [
       }
     ],
     "name": "GoalReached",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsuranceAlreadyExecuted",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsuranceNotTriggered",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InsurancePoolEmpty",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidInsuranceParams",
     "type": "error"
   },
   {
@@ -2289,6 +2443,162 @@ export const CampaignVaultAbi = [
         "type": "uint256"
       },
       {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsuranceCoverageReturned",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "coverage",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int16",
+        "name": "ndwi",
+        "type": "int16"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "rainVsNormalBps",
+        "type": "uint16"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "criticalDryDays",
+        "type": "uint16"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "ndviDropBps",
+        "type": "uint16"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint16",
+        "name": "soilDryDays",
+        "type": "uint16"
+      }
+    ],
+    "name": "InsuranceExecuted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint16",
+            "name": "premiumBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "coverageBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainTriggerBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int16",
+            "name": "ndwiTrigger",
+            "type": "int16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "dryDaysTrigger",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropTriggerBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDaysTrigger",
+            "type": "uint16"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct CampaignVault.InsuranceParams",
+        "name": "params",
+        "type": "tuple"
+      }
+    ],
+    "name": "InsuranceParamsUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsurancePoolFunded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "InsurancePremiumCollected",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      },
+      {
         "indexed": true,
         "internalType": "address",
         "name": "investor",
@@ -2332,6 +2642,11 @@ export const CampaignVaultAbi = [
             "internalType": "int16",
             "name": "criticalNdvi",
             "type": "int16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
           },
           {
             "internalType": "uint16",
@@ -2666,6 +2981,19 @@ export const CampaignVaultAbi = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      }
+    ],
+    "name": "executeInsurance",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "factory",
     "outputs": [
@@ -2673,6 +3001,55 @@ export const CampaignVaultAbi = [
         "internalType": "contract LotFactory",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "fundInsurancePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getLotInsurance",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "premium",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "coverage",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "executed",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct CampaignVault.LotInsurance",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
@@ -2796,6 +3173,91 @@ export const CampaignVaultAbi = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "insuranceParams",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "premiumBps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "coverageBps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "rainTriggerBps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "int16",
+        "name": "ndwiTrigger",
+        "type": "int16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "dryDaysTrigger",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "ndviDropTriggerBps",
+        "type": "uint16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "soilDryDaysTrigger",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "insurancePool",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "lotId",
+        "type": "uint256"
+      }
+    ],
+    "name": "insuranceTrigger",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "triggered",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "executed",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "coverage",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -2854,6 +3316,11 @@ export const CampaignVaultAbi = [
         "internalType": "int16",
         "name": "criticalNdvi",
         "type": "int16"
+      },
+      {
+        "internalType": "uint16",
+        "name": "criticalDryDays",
+        "type": "uint16"
       },
       {
         "internalType": "uint16",
@@ -2989,9 +3456,64 @@ export const CampaignVaultAbi = [
       {
         "components": [
           {
+            "internalType": "uint16",
+            "name": "premiumBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "coverageBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainTriggerBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int16",
+            "name": "ndwiTrigger",
+            "type": "int16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "dryDaysTrigger",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropTriggerBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDaysTrigger",
+            "type": "uint16"
+          }
+        ],
+        "internalType": "struct CampaignVault.InsuranceParams",
+        "name": "p",
+        "type": "tuple"
+      }
+    ],
+    "name": "setInsuranceParams",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
             "internalType": "int16",
             "name": "criticalNdvi",
             "type": "int16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
           },
           {
             "internalType": "uint16",

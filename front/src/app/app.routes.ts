@@ -6,5 +6,6 @@ export const routes: Routes = [
   { path: 'lots/:id', loadComponent: () => import('./pages/lot-detail').then((m) => m.LotDetail), title: 'AgroToken · Lote' },
   { path: 'producer', loadComponent: () => import('./pages/producer').then((m) => m.Producer), title: 'AgroToken · Registrar lote' },
   { path: 'demo', loadComponent: () => import('./pages/demo').then((m) => m.Demo), title: 'AgroToken · Demo' },
+  { path: 'nosotros', loadComponent: () => import('./pages/nosotros').then((m) => m.Nosotros), title: 'AgroToken · Nosotros' },
   { path: '**', redirectTo: '' },
 ];

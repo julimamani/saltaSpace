@@ -13,7 +13,8 @@ import { LotMap } from '../shared/lot-map';
 import { LineChart, type ChartSeries } from '../shared/line-chart';
 import { LotFactoryAbi } from '../web3/generated/abis';
 
-const CROPS = ['Soja', 'Maíz', 'Poroto', 'Trigo', 'Caña de azúcar', 'Tabaco', 'Citrus', 'Vid'];
+const CROPS = ['Soja', 'Maíz', 'Poroto', 'Garbanzos', 'Lentejas', 'Chia','Quinoa','Caña de azúcar', 'Tabaco' ];
+const ISO = (d: Date) => d.toISOString().slice(0, 10);
 
 /** Example polygon: bean field near Rosario de la Frontera (Salta). */
 const SAMPLE: PolygonGeometry = {
@@ -38,29 +39,38 @@ const SAMPLE: PolygonGeometry = {
 
         <section class="card">
           <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 class="card-title">1 · Análisis satelital y climático</h2>
+            <h2 class="card-title">1 · Análisis satelital, radar y balance hídrico</h2>
             <button class="btn-primary" (click)="analyze()" [disabled]="!geometry() || analyzing()">
-              {{ analyzing() ? 'Analizando Sentinel‑2…' : 'Analizar lote' }}
+              {{ analyzing() ? 'Analizando Sentinel‑2 / Sentinel‑1…' : 'Analizar lote' }}
             </button>
+          </div>
+          <div class="mb-3 grid grid-cols-2 gap-3 text-sm">
+            <div><label class="label" for="sowing">Fecha de siembra (para Kc / floración)</label><input id="sowing" name="sowing" type="date" class="input" [(ngModel)]="f.sowingDate" /></div>
+            <p class="self-end text-xs text-stone-500">Cultivo: <b>{{ f.crop }}</b> (curva Kc FAO‑56). Si no cargás siembra, el oráculo asume floración hoy.</p>
           </div>
           @if (analysisError()) { <div class="alert-error">{{ analysisError() }}</div> }
           @if (analysis(); as a) {
             <div class="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div class="mini"><p>NDVI medio</p><b>{{ a.ndvi.mean.toFixed(3) }}</b><span class="text-[11px] text-stone-400">min {{ a.ndvi.min.toFixed(2) }} · max {{ a.ndvi.max.toFixed(2) }}</span></div>
+              <div class="mini"><p>NDVI medio</p><b>{{ a.ndvi.mean.toFixed(3) }}</b><span class="text-[11px] text-stone-400">EVI {{ a.ndvi.evi?.toFixed(2) ?? '—' }} · LAI {{ a.ndvi.lai?.toFixed(1) ?? '—' }}</span></div>
+              <div class="mini"><p>NDWI (agua en hoja)</p><b [class.text-red-700]="(a.ndvi.ndwi ?? 1) < a.insurance.umbrales['ndwi']">{{ a.ndvi.ndwi?.toFixed(3) ?? '—' }}</b><span class="text-[11px] text-stone-400">umbral {{ a.insurance.umbrales['ndwi'] }}</span></div>
               <div class="mini"><p>Riesgo</p><b><span class="rounded px-1.5" [class]="risk().cls">{{ risk().label }}</span></b></div>
               <div class="mini"><p>Índice rendimiento</p><b>{{ a.yield_index.toFixed(3) }}</b></div>
-              <div class="mini"><p>Déficit hídrico</p><b>{{ a.weather.water_deficit_mm.toFixed(0) }} mm</b></div>
+              <div class="mini"><p>Lluvia vs ETc ({{ a.water_balance.crop_label }})</p><b [class.text-red-700]="a.water_balance.balance_mm < 0">{{ a.water_balance.rain_mm.toFixed(0) }} / {{ a.water_balance.etc_mm.toFixed(0) }} mm</b><span class="text-[11px] text-stone-400">ET0 Penman‑Monteith {{ a.water_balance.et0_mm.toFixed(0) }} mm</span></div>
+              <div class="mini"><p>Días críticos floración</p><b>{{ a.water_balance.critical_dry_days }}</b><span class="text-[11px] text-stone-400">lluvia {{ a.water_balance.rain_vs_normal !== null ? (a.water_balance.rain_vs_normal * 100).toFixed(0) + '% del histórico' : '—' }}</span></div>
+              <div class="mini"><p>Radar Sentinel‑1</p><b>VV {{ a.sar.latest_vv_db?.toFixed(1) ?? '—' }} dB</b><span class="text-[11px] text-stone-400">RVI {{ a.sar.latest_rvi?.toFixed(2) ?? '—' }} · suelo seco {{ a.sar.soil_dry_days }} d{{ a.sar.prioritized ? ' · prioritario' : '' }}</span></div>
+              <div class="mini"><p>Seguro paramétrico</p><b [class.text-red-700]="a.insurance.trigger_seguro">{{ a.insurance.trigger_seguro ? 'TRIGGER' : 'sin trigger' }}</b><span class="text-[11px] text-stone-400">hídrico {{ a.insurance.riesgo_hidrico }} · climático {{ a.insurance.riesgo_climatico }}</span></div>
             </div>
             <p class="mb-3 text-xs">
               <span class="chip" [class.!bg-amber-100]="a.ndvi.source === 'mock'">
-                {{ a.ndvi.source === 'mock' ? 'NDVI mock (fallback: no se pudo leer el raster)' : 'Sentinel‑2 L2A · ' + a.ndvi.date + (a.ndvi.cloud_cover != null ? ' · nubes ' + a.ndvi.cloud_cover.toFixed(0) + '%' : '') }}
+                {{ a.ndvi.source === 'mock' ? 'Sentinel‑2 mock (fallback: no se pudo leer el raster)' : 'Sentinel‑2 L2A · ' + a.ndvi.date + (a.ndvi.cloud_cover != null ? ' · nubes ' + a.ndvi.cloud_cover.toFixed(0) + '%' : '') }}
               </span>
-              <span class="chip">Lluvia {{ a.weather.rain_mm.toFixed(0) }} mm · ET0 {{ a.weather.et0_mm.toFixed(0) }} mm</span>
+              <span class="chip" [class.!bg-amber-100]="a.sar.source === 'mock'">{{ a.sar.source === 'mock' ? 'Sentinel‑1 mock' : 'Sentinel‑1 RTC · ' + a.sar.observations.length + ' escenas' }}</span>
               <span class="chip">{{ a.formula_version }}</span>
             </p>
-            <app-line-chart [labels]="chart().labels" [series]="chart().series" [yMin]="0" [yMax]="1" height="12rem" />
+            <p class="mb-3 text-xs text-stone-600">{{ a.insurance.motivos.join(' · ') }}</p>
+            <app-line-chart [labels]="chart().labels" [series]="chart().series" [yMin]="-0.5" [yMax]="1" height="12rem" />
           } @else if (!analyzing()) {
-            <p class="text-sm text-stone-500">El backend busca la escena Sentinel‑2 con menos nubes, recorta B04/B08 al polígono y calcula NDVI; suma lluvia, ET0 y temperatura.</p>
+            <p class="text-sm text-stone-500">El backend elige la mejor escena Sentinel‑2 de cada semana y calcula NDVI, EVI, NDWI y LAI sobre el polígono; lee retrodispersión VV/VH de Sentinel‑1 (radar, atraviesa nubes); y arma el balance hídrico con ET0 Penman‑Monteith × Kc del cultivo, lluvia real e histórico.</p>
           }
         </section>
       </div>
@@ -130,6 +140,7 @@ export class Producer {
     demoTimes: true,
     deadline: 15,
     maturity: 30,
+    sowingDate: ISO(new Date(Date.now() - 45 * 86_400_000)),
   };
 
   protected readonly areaHa = computed(() => {
@@ -141,7 +152,11 @@ export class Producer {
     const s = this.analysis()?.series ?? [];
     return {
       labels: s.map((o) => shortDate(Date.parse(o.date) / 1000)),
-      series: [{ label: 'NDVI medio del lote', data: s.map((o) => o.mean), color: '#16a34a', fill: true }] as ChartSeries[],
+      series: [
+        { label: 'NDVI', data: s.map((o) => o.mean), color: '#16a34a', fill: true },
+        { label: 'EVI', data: s.map((o) => o.evi), color: '#65a30d' },
+        { label: 'NDWI', data: s.map((o) => o.ndwi), color: '#0284c7' },
+      ] as ChartSeries[],
     };
   });
 
@@ -166,7 +181,7 @@ export class Producer {
     this.analyzing.set(true);
     this.analysisError.set(null);
     try {
-      this.analysis.set(await this.api.analyze(g));
+      this.analysis.set(await this.api.analyze(g, { crop: this.f.crop, sowingDate: this.f.sowingDate || undefined }));
     } catch (e) {
       this.analysisError.set(apiError(e));
     } finally {
@@ -209,8 +224,9 @@ export class Producer {
       });
       const [created] = parseEventLogs({ abi: LotFactoryAbi, logs: receipt.logs, eventName: 'LotCreated' });
       const lotId = Number(created.args.lotId);
-      // Best effort: first oracle publication so the lot shows NDVI/risk right away.
-      this.api.push(lotId).then(
+      // Best effort: sowing date for the water balance, then a first oracle publication.
+      const profile = f.sowingDate ? this.api.setProfile(lotId, { sowing_date: f.sowingDate }).catch(() => undefined) : Promise.resolve();
+      profile.then(() => this.api.push(lotId)).then(
         (r) => this.tx.info(`Oráculo publicó NDVI ${r.metrics.ndvi.toFixed(2)} para lote #${lotId}`, r.tx_hash),
         () => undefined,
       );

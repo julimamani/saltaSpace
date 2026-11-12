@@ -29,13 +29,60 @@
       <app-lot-map [geometry]="l.geometry" height="20rem" />
 
       <section class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div class="stat"><p class="stat-label">NDVI actual</p><p class="stat-value">{{ l.metrics ? l.metrics.ndvi.toFixed(3) : '—' }}</p></div>
-        <div class="stat"><p class="stat-label">Riesgo</p><p class="stat-value"><span class="rounded-lg px-2 text-lg" [class]="risk().cls">{{ risk().label }}</span></p></div>
-        <div class="stat"><p class="stat-label">Índice de rendimiento</p><p class="stat-value">{{ l.metrics ? l.metrics.yieldIndex.toFixed(3) : '—' }}</p></div>
+        <div class="stat"><p class="stat-label">NDVI actual</p><p class="stat-value">{{ l.metrics ? l.metrics.ndvi.toFixed(3) : '—' }}</p>
+          @if (l.metrics) { <p class="text-xs text-stone-500">NDWI {{ l.metrics.ndwi.toFixed(3) }}{{ l.metrics.ndviDrop > 0.05 ? ' · cayó ' + pct(l.metrics.ndviDrop, 0) + ' del pico' : '' }}</p> }
+        </div>
+        <div class="stat"><p class="stat-label">Riesgo</p><p class="stat-value"><span class="rounded-lg px-2 text-lg" [class]="risk().cls">{{ risk().label }}</span></p>
+          @if (l.metrics) { <p class="text-xs text-stone-500">{{ l.metrics.criticalDryDays }} días críticos · balance {{ l.metrics.waterBalanceMm }} mm</p> }
+        </div>
+        <div class="stat"><p class="stat-label">Índice de rendimiento</p><p class="stat-value">{{ l.metrics ? l.metrics.yieldIndex.toFixed(3) : '—' }}</p>
+          @if (l.metrics) { <p class="text-xs text-stone-500">lluvia {{ pct(l.metrics.rainVsNormal, 0) }} del histórico</p> }
+        </div>
         <div class="stat">
           <p class="stat-label">Pago estimado / token</p>
           <p class="stat-value" [class.text-red-700]="l.preview.drought">{{ l.preview.payoutPerToken ? usd(l.preview.payoutPerToken) : '—' }}</p>
           <p class="text-xs text-stone-500">{{ l.preview.multiplier ? l.preview.multiplier.toFixed(4) + '× capital' : 'sin métricas' }}{{ l.preview.drought ? ' · penalización sequía' : '' }}</p>
+        </div>
+      </section>
+
+      <section class="card" [class.border-red-300]="l.insurance.triggered && !l.insurance.executed" [class.border-emerald-300]="l.insurance.executed">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="card-title">Seguro paramétrico embebido</h2>
+          @if (insurance(); as ins) {
+            <div class="flex gap-2 text-xs font-semibold">
+              <span class="rounded-full px-2 py-0.5" [class]="riskLevelCls(ins.riesgo_hidrico)">Riesgo hídrico {{ ins.riesgo_hidrico }}</span>
+              <span class="rounded-full px-2 py-0.5" [class]="riskLevelCls(ins.riesgo_climatico)">Riesgo climático {{ ins.riesgo_climatico }}</span>
+            </div>
+          }
+        </div>
+        <div class="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="mini"><p>Pool de seguro</p><b>{{ pool() !== null ? usd(pool()!, 0) : '—' }} USDC</b></div>
+          <div class="mini"><p>Prima de este lote</p><b>{{ usd(l.insurance.premium, 0) }} USDC</b><span class="text-[11px] text-stone-400">{{ insParams() ? pct(insParams()!.premium, 0) + ' del capital, al liberar fondos' : '' }}</span></div>
+          <div class="mini"><p>Trigger on-chain</p><b [class.text-red-700]="l.insurance.triggered">{{ l.insurance.executed ? 'Ejecutado' : l.insurance.triggered ? 'ACTIVADO' : 'No activado' }}</b></div>
+          <div class="mini"><p>{{ l.insurance.executed ? 'Cobertura pagada' : 'Cobertura disponible' }}</p><b>{{ usd(l.insurance.executed ? l.insurance.coverage : l.insurance.coverageAvailable, 0) }} USDC</b><span class="text-[11px] text-stone-400">{{ insParams() ? pct(insParams()!.coverage, 0) + ' del capital, limitado por el pool' : '' }}</span></div>
+        </div>
+        @if (insurance(); as ins) {
+          <ul class="mb-3 grid gap-1 text-sm sm:grid-cols-2">
+            @for (c of ins.condiciones | keyvalue; track c.key) {
+              <li class="flex items-center gap-2"><span class="inline-block h-2.5 w-2.5 rounded-full" [class]="c.value ? 'bg-red-500' : 'bg-emerald-400'"></span>{{ conditionName(c.key) }}</li>
+            }
+          </ul>
+          <p class="text-xs text-stone-600">{{ ins.motivos.join(' · ') }}</p>
+        } @else {
+          <p class="text-sm text-stone-500">{{ metricsError() ?? 'El oráculo todavía no evaluó este lote.' }}</p>
+        }
+        <p class="mt-2 text-xs text-stone-500">
+          Regla on-chain: (NDWI &lt; {{ insParams()?.ndwiTrigger ?? 0.05 }} y (lluvia &lt; {{ pct(insParams()?.rainTrigger ?? 0.5, 0) }} del histórico o ≥ {{ insParams()?.dryDaysTrigger ?? 10 }} días críticos con balance negativo))
+          o NDVI cae ≥ {{ pct(insParams()?.ndviDropTrigger ?? 0.4, 0) }} o radar con suelo seco ≥ {{ insParams()?.soilDryDaysTrigger ?? 21 }} días. Sin peritos: cualquiera puede ejecutar la cobertura y <code>settle()</code> la aplica sola.
+        </p>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          @if (l.status === 'Funded' && l.insurance.triggered && !l.insurance.executed) {
+            <button class="btn-warn" (click)="executeInsurance()" [disabled]="!!busy() || !wallet.ready()">{{ busy() === 'insurance' ? 'Ejecutando…' : 'Ejecutar cobertura ' + usd(l.insurance.coverageAvailable, 0) + ' USDC' }}</button>
+          }
+          <div class="flex items-center gap-2">
+            <input type="number" min="1" step="50" class="input w-28" [ngModel]="poolAmount()" (ngModelChange)="poolAmount.set(+$event || 1)" aria-label="Aporte al pool" />
+            <button class="btn-ghost" (click)="fundPool()" [disabled]="!!busy() || !wallet.ready()">{{ busy() === 'pool' ? 'Aportando…' : 'Aportar al pool' }}</button>
+          </div>
         </div>
       </section>
 
@@ -56,12 +103,41 @@
       </section>
 
       <section class="card">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="card-title">Multiíndice semanal Sentinel‑2 · NDVI / EVI / NDWI</h2>
+          @if (analysis(); as a) { <span class="chip">LAI estimado {{ a.ndvi.lai?.toFixed(2) ?? '—' }} · EVI {{ a.ndvi.evi?.toFixed(3) ?? '—' }} · NDWI {{ a.ndvi.ndwi?.toFixed(3) ?? '—' }}</span> }
+        </div>
+        @if (indexChart().labels.length) {
+          <app-line-chart [labels]="indexChart().labels" [series]="indexChart().series" [yMin]="-0.5" [yMax]="1" height="13rem" />
+          <p class="mt-2 text-xs text-stone-500">El NDVI se satura en canopias densas y no atraviesa nubes; el EVI corrige suelo/atmósfera y el NDWI (B08‑B11) detecta estrés hídrico antes de que la planta amarillee.</p>
+        } @else {
+          <p class="py-6 text-center text-sm text-stone-500">Sin serie satelital todavía.</p>
+        }
+      </section>
+
+      <section class="card">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="card-title">Radar Sentinel‑1 (atraviesa nubes)</h2>
+          @if (analysis(); as a) {
+            <span class="chip" [class.!bg-amber-100]="a.sar.source === 'mock'" [class.!bg-violet-100]="a.sar.prioritized">
+              {{ a.sar.source === 'mock' ? 'radar mock (fallback)' : a.sar.source === 'none' ? 'sin radar' : 'Sentinel‑1 RTC real' }}{{ a.sar.prioritized ? ' · prioritario (Sentinel‑2 > 20% nubes)' : '' }} · suelo seco {{ a.sar.soil_dry_days }} días · RVI {{ a.sar.latest_rvi?.toFixed(2) ?? '—' }}
+            </span>
+          }
+        </div>
+        @if (sarChart().labels.length) {
+          <app-line-chart [labels]="sarChart().labels" [series]="sarChart().series" height="11rem" />
+        } @else {
+          <p class="py-6 text-center text-sm text-stone-500">Sin escenas de radar todavía.</p>
+        }
+      </section>
+
+      <section class="card">
         <h2 class="card-title mb-3">Evolución del pago estimado</h2>
         @if (payoutChart().labels.length) {
           <app-line-chart [labels]="payoutChart().labels" [series]="payoutChart().series" height="14rem" />
           @if (params(); as p) {
             <p class="mt-2 text-xs text-stone-500">
-              pago = precio × clamp(1 + APY {{ pct(l.targetApy) }} × yieldIndex − {{ pct(p.droughtHaircut) }} si NDVI &lt; {{ p.criticalNdvi }}, {{ p.minPayout }}, {{ p.maxPayout }})
+              pago = precio × clamp(1 + APY {{ pct(l.targetApy) }} × yieldIndex − {{ pct(p.droughtHaircut) }} si NDVI &lt; {{ p.criticalNdvi }} o ≥ {{ p.criticalDryDays }} días críticos secos en floración, {{ p.minPayout }}, {{ p.maxPayout }})
             </p>
           }
         } @else {
@@ -70,22 +146,22 @@
       </section>
 
       <section class="card">
-        <h2 class="card-title mb-3">Clima del período (Open‑Meteo + NASA POWER)</h2>
-        @if (metrics()?.latest_analysis?.weather; as w) {
+        <h2 class="card-title mb-3">Balance hídrico del cultivo · FAO‑56 Penman‑Monteith (Open‑Meteo + NASA POWER)</h2>
+        @if (analysis(); as a) {
           <div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div class="mini"><p>Lluvia acumulada</p><b>{{ w.rain_mm.toFixed(0) }} mm</b></div>
-            <div class="mini"><p>Evapotranspiración</p><b>{{ w.et0_mm.toFixed(0) }} mm</b></div>
-            <div class="mini"><p>Déficit hídrico</p><b [class.text-red-700]="w.water_deficit_mm > 100">{{ w.water_deficit_mm.toFixed(0) }} mm</b></div>
-            <div class="mini"><p>Temp. media</p><b>{{ w.temp_mean_c?.toFixed(1) ?? '—' }} °C</b></div>
-            <div class="mini"><p>Días de estrés térmico</p><b>{{ w.heat_stress_days }}</b></div>
-            <div class="mini"><p>Radiación (NASA)</p><b>{{ w.solar_radiation_kwh_m2_day?.toFixed(1) ?? '—' }} kWh/m²</b></div>
-            <div class="mini"><p>Lluvia NASA POWER</p><b>{{ w.nasa_rain_mm?.toFixed(0) ?? '—' }} mm</b></div>
-            <div class="mini"><p>Pronóstico 7 días</p><b>{{ w.forecast_rain_7d_mm?.toFixed(0) ?? '—' }} mm</b></div>
+            <div class="mini"><p>Cultivo / etapa</p><b>{{ a.water_balance.crop_label }} · {{ a.water_balance.stage_today }}</b><span class="text-[11px] text-stone-400">siembra {{ a.water_balance.sowing_date }} ({{ a.water_balance.sowing_basis }})</span></div>
+            <div class="mini"><p>Lluvia de campaña</p><b>{{ a.water_balance.rain_mm.toFixed(0) }} mm</b><span class="text-[11px] text-stone-400">{{ a.water_balance.rain_vs_normal !== null ? pct(a.water_balance.rain_vs_normal, 0) + ' del histórico 2001‑2025' : '' }}</span></div>
+            <div class="mini"><p>ET0 → ETc (× Kc)</p><b>{{ a.water_balance.et0_mm.toFixed(0) }} → {{ a.water_balance.etc_mm.toFixed(0) }} mm</b><span class="text-[11px] text-stone-400">ET0 Open‑Meteo {{ a.weather.et0_ref_mm?.toFixed(0) ?? '—' }} mm (control)</span></div>
+            <div class="mini"><p>Balance lluvia − ETc</p><b [class.text-red-700]="a.water_balance.balance_mm < 0">{{ a.water_balance.balance_mm.toFixed(0) }} mm</b></div>
+            <div class="mini"><p>Días críticos en floración</p><b [class.text-red-700]="a.water_balance.critical_dry_days >= 10">{{ a.water_balance.critical_dry_days }} / {{ a.water_balance.flowering_days_observed }}</b><span class="text-[11px] text-stone-400">{{ a.water_balance.flowering_start }} → {{ a.water_balance.flowering_end }}</span></div>
+            <div class="mini"><p>Racha seca máx.</p><b>{{ a.water_balance.max_dry_spell_days }} días</b></div>
+            <div class="mini"><p>Temp. media / estrés térmico</p><b>{{ a.weather.temp_mean_c?.toFixed(1) ?? '—' }} °C · {{ a.weather.heat_stress_days }} d</b></div>
+            <div class="mini"><p>Pronóstico 7 días</p><b>{{ a.weather.forecast_rain_7d_mm?.toFixed(0) ?? '—' }} mm</b></div>
           </div>
-          @if (rainChart().labels.length) {
-            <app-line-chart [labels]="rainChart().labels" [series]="rainChart().series" height="12rem" />
+          @if (waterChart().labels.length) {
+            <app-line-chart [labels]="waterChart().labels" [series]="waterChart().series" height="13rem" />
           }
-          <p class="mt-2 text-xs text-stone-500">{{ w.start_date }} → {{ w.end_date }} · fuentes: {{ w.sources.join(', ') || '—' }}</p>
+          <p class="mt-2 text-xs text-stone-500">{{ a.weather.start_date }} → {{ a.weather.end_date }} · fuentes: {{ a.weather.sources.join(', ') || '—' }} · reserva útil TAW {{ a.water_balance.taw_mm }} mm, estrés si Dr &gt; RAW {{ a.water_balance.raw_mm }} mm</p>
         } @else {
           <p class="py-6 text-center text-sm text-stone-500">{{ metricsError() ?? 'Sin datos climáticos todavía.' }}</p>
         }

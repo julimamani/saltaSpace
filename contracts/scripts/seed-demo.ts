@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * Creates two demo lots in Salta so the marketplace is not empty, and funds the first one
- * partially. Uses the deployer as producer/investor.
+ * Creates two demo lots in Salta so the marketplace is not empty, funds the first one
+ * partially and seeds the parametric insurance pool. Uses the deployer as producer/investor.
  *   npx hardhat run scripts/seed-demo.ts --network localhost
  */
 const LOTS = [
@@ -81,6 +81,8 @@ async function main() {
   const firstId = (await factory.lotCount()) - BigInt(LOTS.length);
   await (await vault.invest(firstId, 150)).wait();
   console.log(`Deployer ${deployer.address} invested 150 shares in lot ${firstId}`);
+  await (await vault.fundInsurancePool(ethers.parseUnits('2000', 6))).wait();
+  console.log('Insurance pool seeded with 2,000 USDC');
 }
 
 main().catch((err) => {

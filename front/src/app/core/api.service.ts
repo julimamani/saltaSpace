@@ -2,7 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_URL } from './config';
-import type { AnalysisResult, HealthResponse, LotMetricsResponse, PolygonGeometry, PushResult, Scenario } from './models';
+import type { AnalysisResult, HealthResponse, LotInsuranceResponse, LotMetricsResponse, PolygonGeometry, PushResult, Scenario } from './models';
+
+export interface AnalyzeOptions {
+  startDate?: string;
+  endDate?: string;
+  crop?: string;
+  sowingDate?: string;
+  harvestDate?: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -13,10 +21,25 @@ export class ApiService {
     return firstValueFrom(this.http.get<HealthResponse>(`${API_URL}/health`));
   }
 
-  analyze(geometry: PolygonGeometry, startDate?: string, endDate?: string): Promise<AnalysisResult> {
+  analyze(geometry: PolygonGeometry, o: AnalyzeOptions = {}): Promise<AnalysisResult> {
     return firstValueFrom(
-      this.http.post<AnalysisResult>(`${API_URL}/lots/analyze`, { geometry, start_date: startDate, end_date: endDate }),
+      this.http.post<AnalysisResult>(`${API_URL}/lots/analyze`, {
+        geometry,
+        start_date: o.startDate,
+        end_date: o.endDate,
+        crop: o.crop,
+        sowing_date: o.sowingDate,
+        harvest_date: o.harvestDate,
+      }),
     );
+  }
+
+  insurance(lotId: number, refresh = false): Promise<LotInsuranceResponse> {
+    return firstValueFrom(this.http.get<LotInsuranceResponse>(`${API_URL}/lots/${lotId}/seguro`, { params: { refresh } }));
+  }
+
+  setProfile(lotId: number, profile: { sowing_date?: string | null; notes?: string | null }): Promise<unknown> {
+    return firstValueFrom(this.http.put(`${API_URL}/lots/${lotId}/profile`, profile));
   }
 
   metrics(lotId: number): Promise<LotMetricsResponse> {

@@ -61,6 +61,28 @@
   {
     "inputs": [
       {
+        "internalType": "uint16",
+        "name": "ndviDropBps",
+        "type": "uint16"
+      }
+    ],
+    "name": "InvalidNdviDrop",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "int16",
+        "name": "ndwi",
+        "type": "int16"
+      }
+    ],
+    "name": "InvalidNdwi",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint8",
         "name": "riskScore",
         "type": "uint8"
@@ -106,34 +128,67 @@
         "type": "uint256"
       },
       {
+        "components": [
+          {
+            "internalType": "int16",
+            "name": "ndvi",
+            "type": "int16"
+          },
+          {
+            "internalType": "int16",
+            "name": "ndwi",
+            "type": "int16"
+          },
+          {
+            "internalType": "uint8",
+            "name": "riskScore",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint16",
+            "name": "yieldIndexBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int32",
+            "name": "waterBalanceMm",
+            "type": "int32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainVsNormalBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timestamp",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "dataHash",
+            "type": "bytes32"
+          }
+        ],
         "indexed": false,
-        "internalType": "int16",
-        "name": "ndvi",
-        "type": "int16"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "riskScore",
-        "type": "uint8"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint16",
-        "name": "yieldIndexBps",
-        "type": "uint16"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint64",
-        "name": "timestamp",
-        "type": "uint64"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "dataHash",
-        "type": "bytes32"
+        "internalType": "struct OracleConsumer.Metrics",
+        "name": "metrics",
+        "type": "tuple"
       },
       {
         "indexed": true,
@@ -396,6 +451,11 @@
             "type": "int16"
           },
           {
+            "internalType": "int16",
+            "name": "ndwi",
+            "type": "int16"
+          },
+          {
             "internalType": "uint8",
             "name": "riskScore",
             "type": "uint8"
@@ -403,6 +463,31 @@
           {
             "internalType": "uint16",
             "name": "yieldIndexBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int32",
+            "name": "waterBalanceMm",
+            "type": "int32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainVsNormalBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDays",
             "type": "uint16"
           },
           {
@@ -506,29 +591,66 @@
         "type": "uint256"
       },
       {
-        "internalType": "int16",
-        "name": "ndvi",
-        "type": "int16"
-      },
-      {
-        "internalType": "uint8",
-        "name": "riskScore",
-        "type": "uint8"
-      },
-      {
-        "internalType": "uint16",
-        "name": "yieldIndexBps",
-        "type": "uint16"
-      },
-      {
-        "internalType": "uint64",
-        "name": "timestamp",
-        "type": "uint64"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "dataHash",
-        "type": "bytes32"
+        "components": [
+          {
+            "internalType": "int16",
+            "name": "ndvi",
+            "type": "int16"
+          },
+          {
+            "internalType": "int16",
+            "name": "ndwi",
+            "type": "int16"
+          },
+          {
+            "internalType": "uint8",
+            "name": "riskScore",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint16",
+            "name": "yieldIndexBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "int32",
+            "name": "waterBalanceMm",
+            "type": "int32"
+          },
+          {
+            "internalType": "uint16",
+            "name": "criticalDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "rainVsNormalBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "ndviDropBps",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "soilDryDays",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint64",
+            "name": "timestamp",
+            "type": "uint64"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "dataHash",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct OracleConsumer.Metrics",
+        "name": "m",
+        "type": "tuple"
       }
     ],
     "name": "updateLotMetrics",
