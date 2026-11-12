@@ -54,6 +54,8 @@ contract LotFactory is Ownable, Pausable {
     }
 
     address public immutable tokenImplementation;
+    /// @notice Shared KYC registry enforced by every cloned LotToken.
+    address public immutable investorRegistry;
     address public vault;
     Lot[] private _lots;
 
@@ -76,7 +78,9 @@ contract LotFactory is Ownable, Pausable {
         bytes32 geoHash
     );
 
-    constructor(address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner, address investorRegistry_) Ownable(initialOwner) {
+        if (investorRegistry_ == address(0)) revert ZeroAddress();
+        investorRegistry = investorRegistry_;
         tokenImplementation = address(new LotToken());
     }
 
@@ -101,7 +105,7 @@ contract LotFactory is Ownable, Pausable {
 
         lotId = _lots.length;
         address token = Clones.clone(tokenImplementation);
-        LotToken(token).initialize(p.name, p.symbol, vault, lotId);
+        LotToken(token).initialize(p.name, p.symbol, vault, lotId, investorRegistry);
 
         bytes32 geoHash = keccak256(bytes(p.geoJson));
         _lots.push(

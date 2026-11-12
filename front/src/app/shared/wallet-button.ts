@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { WalletService } from '../core/wallet.service';
-import { AVAX_FAUCET_URL, IS_LOCAL_CHAIN, addressUrl } from '../core/config';
+import { GAS_FAUCET_URL, addressUrl } from '../core/config';
 import { shortAddr, usd } from '../core/format';
 
 @Component({
@@ -36,14 +36,29 @@ import { shortAddr, usd } from '../core/format';
                 <p class="font-semibold">{{ usd(w.nativeBalance(), 3) }}</p>
               </div>
             </div>
-            <button class="btn-primary mb-2 w-full" (click)="faucet()" [disabled]="busy()">
-              {{ busy() ? 'Pidiendo…' : 'Faucet: +10.000 USDC de prueba' }}
-            </button>
-            @if (!local) {
-              <a class="btn-ghost mb-2 w-full" [href]="avaxFaucet" target="_blank" rel="noopener">Conseguir AVAX de test (gas) ↗</a>
+            @if (w.verified() === true) {
+              <p class="mb-2 rounded-lg bg-emerald-50 p-2 text-xs font-medium text-emerald-700">KYC: wallet verificada</p>
+            } @else if (w.verified() === false) {
+              @if (w.isCompliance()) {
+                <button class="btn-primary mb-2 w-full" (click)="verify()" [disabled]="busy()">
+                  {{ busy() ? 'Verificando…' : 'Verificar mi wallet (KYC simulado)' }}
+                </button>
+              } @else {
+                <p class="mb-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                  KYC pendiente: pedí la verificación a un compliance officer para poder invertir.
+                </p>
+              }
+            }
+            @if (w.canFaucet()) {
+              <button class="btn-primary mb-2 w-full" (click)="faucet()" [disabled]="busy()">
+                {{ busy() ? 'Pidiendo…' : 'Faucet: +10.000 USDC de prueba' }}
+              </button>
+            }
+            @if (gasFaucet; as url) {
+              <a class="btn-ghost mb-2 w-full" [href]="url" target="_blank" rel="noopener">Conseguir {{ w.chain.nativeCurrency.symbol }} de test (gas) ↗</a>
             }
             @if (explorer(); as url) {
-              <a class="block text-center text-xs text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">Ver cuenta en Snowtrace ↗</a>
+              <a class="block text-center text-xs text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">Ver cuenta en el explorador ↗</a>
             }
             @if (error()) { <p class="mt-2 text-xs text-red-600">{{ error() }}</p> }
           </div>
@@ -59,8 +74,7 @@ export class WalletButton {
   protected readonly error = signal<string | null>(null);
   protected readonly short = shortAddr;
   protected readonly usd = usd;
-  protected readonly local = IS_LOCAL_CHAIN;
-  protected readonly avaxFaucet = AVAX_FAUCET_URL;
+  protected readonly gasFaucet = GAS_FAUCET_URL;
 
   protected explorer(): string | null {
     const a = this.w.account();
@@ -81,6 +95,18 @@ export class WalletButton {
     this.error.set(null);
     try {
       await this.w.faucet();
+    } catch (e) {
+      this.error.set(e instanceof Error ? e.message : String(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async verify(): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await this.w.verifySelf();
     } catch (e) {
       this.error.set(e instanceof Error ? e.message : String(e));
     } finally {

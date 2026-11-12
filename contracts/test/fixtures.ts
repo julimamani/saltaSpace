@@ -23,7 +23,8 @@ export async function deployFixture() {
 
   const usdc = await ethers.deployContract('MockUSDC');
   const oracle = await ethers.deployContract('OracleConsumer', [admin.address, oracleSigner.address]);
-  const factory = await ethers.deployContract('LotFactory', [admin.address]);
+  const registry = await ethers.deployContract('InvestorRegistry', [admin.address, ethers.ZeroAddress]);
+  const factory = await ethers.deployContract('LotFactory', [admin.address, await registry.getAddress()]);
   const vault = await ethers.deployContract('CampaignVault', [
     admin.address,
     await usdc.getAddress(),
@@ -36,6 +37,11 @@ export async function deployFixture() {
     await usdc.connect(s).faucet();
     await usdc.connect(s).approve(await vault.getAddress(), ethers.MaxUint256);
   }
+  // KYC: every test signer is a verified investor (see InvestorRegistry.test.ts for the gate).
+  await registry.setInvestors(
+    [admin, producer, alice, bob, stranger].map((s) => s.address),
+    true,
+  );
 
   const now = await time.latest();
   const lotParams = {
@@ -54,7 +60,7 @@ export async function deployFixture() {
   const lot = await factory.getLot(0);
   const token = await ethers.getContractAt('LotToken', lot.token);
 
-  return { admin, oracleSigner, producer, alice, bob, stranger, usdc, oracle, factory, vault, token, lotParams };
+  return { admin, oracleSigner, producer, alice, bob, stranger, usdc, oracle, registry, factory, vault, token, lotParams };
 }
 
 /** Fully funds lot 0: alice buys 60 shares, bob 40 (goal = 100 shares x 10 USDC). */

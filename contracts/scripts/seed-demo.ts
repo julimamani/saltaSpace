@@ -69,6 +69,13 @@ async function main() {
     console.log(`Created lot "${l.name}"`);
   }
 
+  if (dep.usdcIsMock === false) {
+    console.log('Payment token is not MockUSDC; skipping faucet/investor seeding.');
+    return;
+  }
+  // KYC gate: the deployer must be a verified investor to buy shares.
+  const registry = await ethers.getContractAt('InvestorRegistry', dep.contracts.InvestorRegistry);
+  await (await registry.setInvestor(deployer.address, true)).wait();
   await (await usdc.faucet()).wait();
   await (await usdc.approve(dep.contracts.CampaignVault, ethers.MaxUint256)).wait();
   const firstId = (await factory.lotCount()) - BigInt(LOTS.length);
