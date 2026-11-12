@@ -19,5 +19,6 @@ export class App {
     { path: '/lots', label: 'Mercado', exact: false },
     { path: '/producer', label: 'Registrar lote', exact: false },
     { path: '/demo', label: 'Demo', exact: false },
+    { path: '/nosotros', label: 'Nosotros', exact: false },
   ];
 }
