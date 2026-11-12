@@ -9,8 +9,10 @@
     "export-abis": "hardhat compile && ts-node scripts/export-abis.ts",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:fuji": "hardhat run scripts/deploy.ts --network fuji",
+    "deploy:l1": "hardhat run scripts/deploy.ts --network l1",
     "seed:local": "hardhat run scripts/seed-demo.ts --network localhost",
-    "seed:fuji": "hardhat run scripts/seed-demo.ts --network fuji"
+    "seed:fuji": "hardhat run scripts/seed-demo.ts --network fuji",
+    "seed:l1": "hardhat run scripts/seed-demo.ts --network l1"
   },
   "keywords": [],
   "author": "",

@@ -9,6 +9,8 @@ const FRIENDLY: Record<string, string> = {
   NotMatured: 'Todavía no llegó la fecha de cosecha (madurez).',
   NoMetrics: 'El oráculo aún no publicó métricas para este lote.',
   NothingToClaim: 'No tenés tokens de este lote.',
+  NotVerified: 'La wallet no está verificada (KYC).',
+  AccessControlUnauthorizedAccount: 'No tenés permisos para esta acción.',
   FaucetCooldown: 'El faucet se puede usar una vez por hora.',
   InvalidParams: 'Parámetros del lote inválidos.',
   ZeroAmount: 'El monto debe ser mayor a cero.',

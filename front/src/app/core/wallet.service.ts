@@ -10,10 +10,14 @@ import {
   type Address,
   type Hash,
   type TransactionReceipt,
+  keccak256,
+  toBytes,
 } from 'viem';
 import { DEPLOYMENT, TARGET_CHAIN, USDC_DECIMALS } from './config';
 import { TxService } from './tx.service';
-import { MockUSDCAbi } from '../web3/generated/abis';
+import { InvestorRegistryAbi, MockUSDCAbi } from '../web3/generated/abis';
+
+const COMPLIANCE_ROLE = keccak256(toBytes('COMPLIANCE_ROLE'));
 
 interface Eip1193 {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
@@ -43,10 +47,16 @@ export class WalletService {
   readonly usdcBalance = signal<number | null>(null);
   readonly nativeBalance = signal<number | null>(null);
   readonly lastError = signal<string | null>(null);
+  /** KYC: whether the connected wallet may hold lot tokens (InvestorRegistry). */
+  readonly verified = signal<boolean | null>(null);
+  /** Whether the connected wallet can verify investors (COMPLIANCE_ROLE). */
+  readonly isCompliance = signal(false);
 
   readonly connected = computed(() => this.account() !== null);
   readonly wrongChain = computed(() => this.connected() && this.chainId() !== this.chain.id);
   readonly ready = computed(() => this.connected() && !this.wrongChain());
+  /** MockUSDC has a public faucet; a real stablecoin (USDC_ADDRESS deploy) does not. */
+  readonly canFaucet = computed(() => this.deployment?.usdcIsMock !== false);
 
   constructor() {
     if (this.browser) void this.init();
@@ -130,10 +140,13 @@ export class WalletService {
     if (!acc || !this.deployment || this.wrongChain()) {
       this.usdcBalance.set(null);
       this.nativeBalance.set(null);
+      this.verified.set(null);
+      this.isCompliance.set(false);
       return;
     }
     try {
-      const [usdc, native] = await Promise.all([
+      const registry = this.deployment.contracts.InvestorRegistry;
+      const [usdc, native, verified, compliance] = await Promise.all([
         this.publicClient.readContract({
           address: this.deployment.contracts.MockUSDC,
           abi: MockUSDCAbi,
@@ -141,9 +154,13 @@ export class WalletService {
           args: [acc],
         }),
         this.publicClient.getBalance({ address: acc }),
+        this.publicClient.readContract({ address: registry, abi: InvestorRegistryAbi, functionName: 'isVerified', args: [acc] }),
+        this.publicClient.readContract({ address: registry, abi: InvestorRegistryAbi, functionName: 'hasRole', args: [COMPLIANCE_ROLE, acc] }),
       ]);
       this.usdcBalance.set(Number(formatUnits(usdc, USDC_DECIMALS)));
       this.nativeBalance.set(Number(formatUnits(native, 18)));
+      this.verified.set(verified);
+      this.isCompliance.set(compliance);
     } catch {
       this.usdcBalance.set(null);
     }
@@ -174,7 +191,9 @@ export class WalletService {
   }
 
   async faucet(): Promise<void> {
-    if (!this.deployment) return;
+    if (!this.deployment || !this.canFaucet()) {
+      throw new Error('El token de pago no es MockUSDC: conseguí USDC en el faucet de Circle o con el operador de la red.');
+    }
     await this.write('Faucet: 10.000 USDC de prueba', {
       address: this.deployment.contracts.MockUSDC,
       abi: MockUSDCAbi,
@@ -198,6 +217,18 @@ export class WalletService {
       abi: MockUSDCAbi,
       functionName: 'approve',
       args: [spender, amount],
+    });
+  }
+
+  /** Demo KYC: a COMPLIANCE_ROLE wallet verifies itself in the InvestorRegistry. */
+  async verifySelf(): Promise<void> {
+    const acc = this.account();
+    if (!acc || !this.deployment) return;
+    await this.write('KYC: verificar wallet', {
+      address: this.deployment.contracts.InvestorRegistry,
+      abi: InvestorRegistryAbi,
+      functionName: 'setInvestor',
+      args: [acc, true],
     });
   }
 

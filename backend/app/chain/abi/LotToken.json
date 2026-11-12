@@ -106,6 +106,17 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "NotVerified",
+    "type": "error"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
@@ -287,6 +298,11 @@
         "internalType": "uint256",
         "name": "lotId_",
         "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "registry_",
+        "type": "address"
       }
     ],
     "name": "initialize",
@@ -346,6 +362,19 @@
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "registry",
+    "outputs": [
+      {
+        "internalType": "contract IInvestorRegistry",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",

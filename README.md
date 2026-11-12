@@ -51,11 +51,12 @@ flowchart LR
 | `contracts/` | Solidity 0.8.24 + Hardhat TS + OpenZeppelin v5: `MockUSDC`, `LotFactory`, `LotToken` (clones EIP‑1167), `CampaignVault`, `OracleConsumer`. Tests, deploy, seed y export de ABIs. |
 | `backend/` | Python 3.11, FastAPI, pystac-client, rasterio/numpy, httpx, web3.py, APScheduler. |
 | `front/` | Angular 21 standalone + SSR, Tailwind v4, viem, Leaflet, Chart.js. |
-| `docs/` | [Fórmulas](docs/scoring.md), [seguro paramétrico](docs/seguro-parametrico.md), [deploy en Fuji](docs/deploy-fuji.md), [guion de demo](docs/demo-script.md). |
+| `docs/` | [Fórmulas](docs/scoring.md), [seguro paramétrico](docs/seguro-parametrico.md), [deploy en Fuji](docs/deploy-fuji.md), [deploy en una L1](docs/deploy-l1.md), [guion de demo](docs/demo-script.md). |
 
 ### Contratos
 
 - **`LotFactory`**: crea lotes (productor, nombre, cultivo, hectáreas, GeoJSON + `geoHash`, meta, precio por token, cierre, madurez, APY objetivo) y clona un `LotToken` por lote.
+- **`InvestorRegistry`**: allowlist KYC/AML compartida por todos los `LotToken`. Solo wallets verificadas (`COMPLIANCE_ROLE`) pueden **recibir** tokens — al invertir y en transferencias secundarias. Quemar (claim/refund) nunca se restringe.
 - **`CampaignVault`**: `invest`, `releaseFundsToProducer`, `refund`, `depositRepayment`, `settle`, `claim` + seguro paramétrico: `fundInsurancePool`, `executeInsurance`, `insuranceTrigger`, `getLotInsurance`. Estados `Funding → Funded → Settled` o `Funding → Failed`. `ReentrancyGuard`, `Pausable`, `SafeERC20`, `AccessControl`, errores custom y eventos en cada acción.
 - **`OracleConsumer`**: `ORACLE_ROLE` publica `updateLotMetrics(lotId, Metrics)` con `ndvi`, `ndwi`, `riskScore`, `yieldIndexBps`, `waterBalanceMm`, `criticalDryDays`, `rainVsNormalBps`, `ndviDropBps`, `soilDryDays`, `timestamp`, `dataHash`; el historial completo queda en eventos `MetricsUpdated`.
 - **Pago**: `pricePerToken × clamp(1 + APY × yieldIndex − haircut_sequía, 0.8, 1.3)`; hay sequía si `NDVI < 0.30` **o** `criticalDryDays ≥ 10` (días de floración con balance hídrico negativo). Pro‑rata si el repago + cobertura no alcanza. Ver [docs/scoring.md](docs/scoring.md).
@@ -137,15 +138,19 @@ npm start                     # http://localhost:4200
 |---|---|
 | `DEPLOYER_PRIVATE_KEY` | Wallet que despliega en Fuji (necesita AVAX de test). **Nunca la commitees.** |
 | `ORACLE_ADDRESS` | Dirección que recibe `ORACLE_ROLE` (la del backend). Por defecto, el deployer. |
+| `COMPLIANCE_ADDRESS` | Dirección que recibe `COMPLIANCE_ROLE` (verifica inversores / KYC). Por defecto, el deployer. |
 | `FUJI_RPC_URL` | Default `https://api.avax-test.network/ext/bc/C/rpc`. |
 | `LOCAL_RPC_URL` | Default `http://127.0.0.1:8545`. |
+| `L1_RPC_URL`, `L1_CHAIN_ID` | Habilitan la red `l1` (Avalanche L1 propia, subnet-evm). |
+| `EVM_VERSION` | `cancun` por defecto; `shanghai`/`paris` si la L1 corre un EVM viejo. |
+| `USDC_ADDRESS` | ERC-20 existente como medio de pago (stablecoin real) en vez de desplegar `MockUSDC`. |
 
 **`backend/.env`** (ver `.env.example`)
 
 | Variable | Default | Uso |
 |---|---|---|
 | `RPC_URL` | `http://127.0.0.1:8545` | RPC de la red. |
-| `CHAIN_NETWORK` | `localhost` | `localhost` o `fuji` (archivo en `app/chain/deployments/`). |
+| `CHAIN_NETWORK` | `localhost` | `localhost`, `fuji` o `l1` (archivo en `app/chain/deployments/`). |
 | `ORACLE_PRIVATE_KEY` | — | Clave con `ORACLE_ROLE`. Sin ella, la API funciona en solo lectura. |
 | `SIMULATE_DROUGHT` | `false` | Fuerza el escenario sequía en todos los lotes. |
 | `FORCE_MOCK_NDVI` | `false` | Saltea Sentinel‑2 y usa el mock determinístico. |
@@ -166,6 +171,16 @@ npm start                     # http://localhost:4200
 6. Front: `npm run build` / `npm start`; las transacciones enlazan a [Snowtrace testnet](https://testnet.snowtrace.io).
 
 Detalle en [docs/deploy-fuji.md](docs/deploy-fuji.md).
+
+## Deploy en una Avalanche L1 propia
+
+1. Creá la L1 (Avalanche CLI / Builder Hub) y anotá `chainId`, RPC y el símbolo del gas token.
+2. `contracts/.env`: `L1_RPC_URL`, `L1_CHAIN_ID` y `DEPLOYER_PRIVATE_KEY` → `npm run deploy:l1` (y `seed:l1` opcional). Si la L1 corre un EVM viejo, `EVM_VERSION=shanghai`.
+3. `backend/.env`: `CHAIN_NETWORK=l1`, `RPC_URL=<rpc l1>`, `ORACLE_PRIVATE_KEY`, `EXPLORER_TX_URL`.
+4. `front/src/index.html`: un `<script>` con `window.AGRO_L1 = {chainId, rpcUrl, name, currencySymbol, explorerUrl, gasFaucetUrl}`.
+5. **Stablecoin real**: `USDC_ADDRESS=<erc20>` en el deploy usa ese token en vez de `MockUSDC` (el `CampaignVault` toma cualquier `IERC20` de 6 decimales; el front oculta el faucet). Para USDC nativo de C-Chain, bridjealo con ICTT/Teleporter.
+
+Detalle en [docs/deploy-l1.md](docs/deploy-l1.md).
 
 ## Demo de 3 minutos
 
