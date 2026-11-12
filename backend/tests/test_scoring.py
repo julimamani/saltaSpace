@@ -41,7 +41,7 @@ def test_scenarios_move_scores_in_the_expected_direction():
     start = date(2026, 1, 1)
     series = [IndexObservation(date=start + timedelta(days=14 * i), mean=0.6, min=0.5, max=0.7, evi=0.4, ndwi=0.2, lai=1.3, source="mock") for i in range(5)]
     daily = [WeatherDay(date=start + timedelta(days=i), precipitation_mm=6.0 if i % 2 else 0.0, temp_mean_c=25, temp_max_c=31, et0_mm=5.0) for i in range(60)]
-    w = WeatherSummary(start_date=start, end_date=start + timedelta(days=59), rain_mm=180, et0_mm=300, water_deficit_mm=120, temp_mean_c=25, heat_stress_days=2, normal_rain_mm=200, daily=daily)
+    w = WeatherSummary(start_date=start, end_date=start + timedelta(days=59), rain_mm=180, et0_mm=300, water_deficit_mm=120, temp_mean_c=25, heat_stress_days=2, normal_rain_mm=200, climatology_mm_day={m: 3.3 for m in ('JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC')}, daily=daily)
     sar = SarSummary(soil_dry_days=0, latest_rvi=0.5, latest_vv_db=-11, source="mock")
 
     def run(scenario: str):

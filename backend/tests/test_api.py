@@ -12,7 +12,7 @@ GEOM = {"type": "Polygon", "coordinates": [[[-64.98, -25.8], [-64.97, -25.8], [-
 
 def fake_weather(lat, lon, start, end, s):
     daily = [WeatherDay(date=start + timedelta(days=i), precipitation_mm=3.0, temp_mean_c=24, temp_max_c=30, et0_mm=4.5) for i in range((end - start).days + 1)]
-    return WeatherSummary(start_date=start, end_date=end, rain_mm=3.0 * len(daily), et0_mm=4.5 * len(daily), water_deficit_mm=1.5 * len(daily), temp_mean_c=24, heat_stress_days=1, normal_rain_mm=250, daily=daily, sources=["fake"])
+    return WeatherSummary(start_date=start, end_date=end, rain_mm=3.0 * len(daily), et0_mm=4.5 * len(daily), water_deficit_mm=1.5 * len(daily), temp_mean_c=24, heat_stress_days=1, normal_rain_mm=250, climatology_mm_day={m: 4.0 for m in ('JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC')}, daily=daily, sources=["fake"])
 
 
 def fake_sar(geometry, start, end, s, prioritized):

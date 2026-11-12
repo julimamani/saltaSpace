@@ -102,6 +102,7 @@ class WeatherSummary(BaseModel):
     nasa_temp_mean_c: float | None = None
     forecast_rain_7d_mm: float | None = None
     normal_rain_mm: float | None = Field(None, description="NASA POWER 2001-2025 climatology for the same calendar window")
+    climatology_mm_day: dict[str, float] | None = Field(None, description="NASA POWER monthly normal rain (mm/day), keys JAN..DEC")
     daily: list[WeatherDay] = []
     sources: list[str] = []
     errors: list[str] = []

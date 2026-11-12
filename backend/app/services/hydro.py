@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from ..config import Settings
 from ..schemas import WaterBalance, WeatherDay, WeatherSummary
 from .crops import CropProfile, estimate_sowing, profile_for
+from .weather import normal_rain
 
 
 def season_window(crop_name: str | None, today: date, sowing: date | None, harvest: date | None, s: Settings) -> tuple[CropProfile, date, str, date]:
@@ -60,11 +61,11 @@ def summarize(w: WeatherSummary, crop: CropProfile, sowing: date, basis: str, ha
     rain = sum(d.precipitation_mm or 0 for d in season_days)
     et0 = sum((d.et0_mm if d.et0_mm is not None else d.et0_ref_mm) or 0 for d in season_days)
     etc = sum(d.etc_mm or 0 for d in season_days)
-    normal = w.normal_rain_mm
+    normal: float | None = None
     ratio: float | None = None
-    if normal is not None and season_days and w.daily:
-        # The climatology was fetched for the whole data window; scale it to the season days.
-        normal = round(normal * len(season_days) / len(w.daily), 1)
+    if season_days and w.climatology_mm_day:
+        # Normal rain for the season's own calendar days (not the whole data window).
+        normal = normal_rain(w.climatology_mm_day, season_days[0].date, season_days[-1].date)
         ratio = round(rain / normal, 3) if normal >= s.min_normal_rain_mm else 1.0
     taw = 1000 * s.soil_available_water_m3_m3 * crop.root_depth_m
     return WaterBalance(

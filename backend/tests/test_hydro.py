@@ -14,7 +14,8 @@ def _weather(start: date, days: int, rain_every: int | None, et0: float = 5.0, n
         d = start + timedelta(days=i)
         rain = 20.0 if rain_every and i % rain_every == 0 else 0.0
         daily.append(WeatherDay(date=d, precipitation_mm=rain, temp_mean_c=25, temp_max_c=31, et0_mm=et0))
-    return WeatherSummary(start_date=start, end_date=start + timedelta(days=days - 1), rain_mm=sum(d.precipitation_mm for d in daily), et0_mm=et0 * days, water_deficit_mm=0, temp_mean_c=25, heat_stress_days=0, normal_rain_mm=normal, daily=daily)
+    clim = None if normal is None else {m: round(normal / days, 4) for m in ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")}
+    return WeatherSummary(start_date=start, end_date=start + timedelta(days=days - 1), rain_mm=sum(d.precipitation_mm for d in daily), et0_mm=et0 * days, water_deficit_mm=0, temp_mean_c=25, heat_stress_days=0, normal_rain_mm=normal, climatology_mm_day=clim, daily=daily)
 
 
 def test_crop_lookup_and_kc_curve():

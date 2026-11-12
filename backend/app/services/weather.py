@@ -150,15 +150,20 @@ def fetch_nasa_power(lat: float, lon: float, start: date, end: date, s: Settings
     }
 
 
-def fetch_normal_rain(lat: float, lon: float, start: date, end: date, s: Settings, client: httpx.Client) -> float:
-    """Climatological rain for the same calendar window (NASA POWER 2001-2025 monthly mm/day)."""
+def fetch_climatology(lat: float, lon: float, s: Settings, client: httpx.Client) -> dict[str, float]:
+    """NASA POWER 2001-2025 monthly normal rain, mm/day, keyed JAN..DEC."""
     p = _get_json(
         client, s.nasa_power_climatology_url, {"parameters": "PRECTOTCORR", "community": "AG", "latitude": lat, "longitude": lon, "format": "JSON"}
     )["properties"]["parameter"]["PRECTOTCORR"]
+    return {k: float(v) for k, v in p.items() if k != "ANN"}
+
+
+def normal_rain(clim: dict[str, float], start: date, end: date) -> float:
+    """Climatological rain for a calendar window, summing each day's monthly normal."""
     total = 0.0
     d = start
     while d <= end:
-        total += float(p[calendar.month_abbr[d.month].upper()])
+        total += clim[calendar.month_abbr[d.month].upper()]
         d += timedelta(days=1)
     return round(total, 1)
 
@@ -170,6 +175,7 @@ def get_weather(lat: float, lon: float, start: date, end: date, s: Settings) -> 
     nasa: dict[str, Any] = {}
     forecast: float | None = None
     normal: float | None = None
+    clim: dict[str, float] | None = None
     elevation: float | None = None
     with httpx.Client(timeout=s.http_timeout_s) as client:
         try:
@@ -189,7 +195,8 @@ def get_weather(lat: float, lon: float, start: date, end: date, s: Settings) -> 
             log.warning("NASA POWER failed: %s", exc)
             errors.append(f"nasa-power: {exc}")
         try:
-            normal = fetch_normal_rain(lat, lon, start, end, s, client)
+            clim = fetch_climatology(lat, lon, s, client)
+            normal = normal_rain(clim, start, end)
             sources.append("nasa-power-climatology")
         except Exception as exc:
             errors.append(f"nasa-power climatology: {exc}")
@@ -218,6 +225,7 @@ def get_weather(lat: float, lon: float, start: date, end: date, s: Settings) -> 
         nasa_temp_mean_c=nasa.get("temp_mean_c"),
         forecast_rain_7d_mm=forecast,
         normal_rain_mm=normal,
+        climatology_mm_day=clim,
         daily=days,
         sources=sources,
         errors=errors,
