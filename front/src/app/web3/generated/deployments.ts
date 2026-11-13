@@ -15,33 +15,33 @@ export const DEPLOYMENTS: Record<number, Deployment> = {
   "31337": {
     "network": "localhost",
     "chainId": 31337,
-    "startBlock": 24,
+    "startBlock": 0,
     "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     "oracle": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     "usdcIsMock": true,
     "contracts": {
-      "MockUSDC": "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f",
-      "OracleConsumer": "0x4A679253410272dd5232B3Ff7cF5dbB88f295319",
-      "InvestorRegistry": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-      "LotFactory": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
-      "CampaignVault": "0xc5a5C42992dECbae36851359345FE25997F5C42d"
+      "MockUSDC": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "OracleConsumer": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "InvestorRegistry": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "LotFactory": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "CampaignVault": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
-    "deployedAt": "2026-11-12T19:59:40.336Z"
+    "deployedAt": "2026-11-13T02:55:48.418Z"
   },
   "500301": {
     "network": "l1",
     "chainId": 500301,
-    "startBlock": 0,
+    "startBlock": 15,
     "deployer": "0x4cD2079B00eB41f8B4f5ddEEE7e48cce9f16A4Aa",
     "oracle": "0x4cD2079B00eB41f8B4f5ddEEE7e48cce9f16A4Aa",
     "usdcIsMock": true,
     "contracts": {
-      "MockUSDC": "0x95b7Ea65dc27A494608E57f7Bf3C62bC454a43a5",
-      "OracleConsumer": "0x5060ca94F6e94A0C3DB359d83adeB0Da4E79989C",
-      "InvestorRegistry": "0xc5063a48CBEcEA9079927ACc0e1ad5063bd85fbE",
-      "LotFactory": "0x37C587452f907d9a35991719f7D17F2572A13e60",
-      "CampaignVault": "0xb73786e8a742e3BBFE9b270a19a168C3d1445f8d"
+      "MockUSDC": "0xB3b0C7D3e02CDa1F410F1Ac524Fc447Ad3CBBD65",
+      "OracleConsumer": "0x5366bb98F48547d1582aeFe0a4b651AFEB9D7bc7",
+      "InvestorRegistry": "0xA519A196C03c4081DF5bc1E4Cc8B10cdc16B29f6",
+      "LotFactory": "0x31B2b85392D31F50737AF56e9b64A8dEa3D0a83C",
+      "CampaignVault": "0x4a8e9B5FB81B3f67c51D603546490B6FB4bcD2a5"
     },
-    "deployedAt": "2026-11-12T19:22:21.342Z"
+    "deployedAt": "2026-11-12T20:14:08.990Z"
   }
 };

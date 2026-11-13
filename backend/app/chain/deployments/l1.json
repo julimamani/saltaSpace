@@ -1,16 +1,16 @@
 {
   "network": "l1",
   "chainId": 500301,
-  "startBlock": 0,
+  "startBlock": 15,
   "deployer": "0x4cD2079B00eB41f8B4f5ddEEE7e48cce9f16A4Aa",
   "oracle": "0x4cD2079B00eB41f8B4f5ddEEE7e48cce9f16A4Aa",
   "usdcIsMock": true,
   "contracts": {
-    "MockUSDC": "0x95b7Ea65dc27A494608E57f7Bf3C62bC454a43a5",
-    "OracleConsumer": "0x5060ca94F6e94A0C3DB359d83adeB0Da4E79989C",
-    "InvestorRegistry": "0xc5063a48CBEcEA9079927ACc0e1ad5063bd85fbE",
-    "LotFactory": "0x37C587452f907d9a35991719f7D17F2572A13e60",
-    "CampaignVault": "0xb73786e8a742e3BBFE9b270a19a168C3d1445f8d"
+    "MockUSDC": "0xB3b0C7D3e02CDa1F410F1Ac524Fc447Ad3CBBD65",
+    "OracleConsumer": "0x5366bb98F48547d1582aeFe0a4b651AFEB9D7bc7",
+    "InvestorRegistry": "0xA519A196C03c4081DF5bc1E4Cc8B10cdc16B29f6",
+    "LotFactory": "0x31B2b85392D31F50737AF56e9b64A8dEa3D0a83C",
+    "CampaignVault": "0x4a8e9B5FB81B3f67c51D603546490B6FB4bcD2a5"
   },
-  "deployedAt": "2026-11-12T19:22:21.342Z"
+  "deployedAt": "2026-11-12T20:14:08.990Z"
 }
