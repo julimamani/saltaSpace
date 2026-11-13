@@ -1,8 +1,15 @@
-# One-command local demo: Hardhat node + deploy/seed + FastAPI oracle + Angular SSR.
-#   docker compose up --build
-# Front: http://localhost:4000 · API: http://localhost:8000/docs · RPC: http://localhost:8545 (chainId 31337)
+# The stack runs on the Avalanche L1 (chainId 500301, AvaCloud managed).
+#   docker compose up -d --build
+# Front: http://localhost:4000 · API: http://localhost:8000/docs
+#
+# Chain config comes from the project .env (compose substitution) or the defaults below.
+# For the local Hardhat demo instead (chainId 31337):
+#   RPC_URL=http://hardhat:8545 CHAIN_NETWORK=localhost ORACLE_PRIVATE_KEY=<hardhat #0> \
+#     docker compose --profile local up -d --build
+# and open the front with ?chain=31337.
 services:
   hardhat:
+    profiles: ["local"]
     build: ./contracts
     ports: ["8545:8545"]
     healthcheck:
@@ -11,6 +18,7 @@ services:
       retries: 20
 
   deployer:
+    profiles: ["local"]
     build: ./contracts
     depends_on:
       hardhat: { condition: service_healthy }
@@ -25,17 +33,16 @@ services:
 
   backend:
     build: ./backend
-    depends_on:
-      deployer: { condition: service_completed_successfully }
     ports: ["8000:8000"]
     env_file:
       - path: ./backend/.env
         required: false
     environment:
-      RPC_URL: http://hardhat:8545
-      CHAIN_NETWORK: localhost
-      # Hardhat account #0 — a PUBLICLY KNOWN dev key, only valid on the local node. Never use it on a real network.
-      ORACLE_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+      # Avalanche L1 (AvaCloud managed). Override on the command line or in .env for local.
+      RPC_URL: ${RPC_URL:-https://managed-nodes.avax.network/ext/bc/25q34oCrUpLtwMWfnkCcfcKiH6ec84npvtSBy1bLGRyN4KiizF/rpc}
+      CHAIN_NETWORK: ${CHAIN_NETWORK:-l1}
+      # Wallet with ORACLE_ROLE on the L1 (needs gas token). Set it in .env — never commit a real key.
+      ORACLE_PRIVATE_KEY: ${ORACLE_PRIVATE_KEY:?set ORACLE_PRIVATE_KEY in .env (the L1 deployer/oracle wallet)}
       ENABLE_SCHEDULER: "true"
       ORACLE_INTERVAL_MINUTES: "30"
       CORS_ORIGINS: http://localhost:4000,http://localhost:4200,http://127.0.0.1:4000

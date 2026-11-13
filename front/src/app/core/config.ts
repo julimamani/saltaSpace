@@ -10,12 +10,18 @@ export const hardhatLocal = defineChain({
   rpcUrls: { default: { http: ['http://127.0.0.1:8545'] } },
 });
 
+const apiBase =
+  (typeof window !== 'undefined' && (window as { AGRO_API_URL?: string }).AGRO_API_URL) || 'http://localhost:8000';
+
 /**
- * Optional custom Avalanche L1, injected at runtime — same pattern as AGRO_API_URL.
- * Add an inline <script> before </body> in index.html (or serve a config file):
- *   window.AGRO_L1 = { chainId: 12345, rpcUrl: 'https://…/rpc', name: 'Mi L1',
+ * Custom Avalanche L1. Defaults to the OrbiTag L1 (DEFAULT_L1) so SSR/prerender and the
+ * browser resolve the same chain. Override at runtime with an inline <script> in index.html:
+ *   window.AGRO_L1 = { chainId: 12345, rpcUrl: '/rpc', name: 'Mi L1',
  *                      currencySymbol: 'GAS', explorerUrl: 'https://explorer…' ,
  *                      gasFaucetUrl: 'https://faucet…' };
+ * rpcUrl may be a path ('/rpc') resolved against the API origin — needed when the
+ * upstream RPC does not allow browser CORS (e.g. AvaCloud managed nodes): the
+ * backend's /rpc endpoint proxies the JSON-RPC calls server-side.
  */
 interface L1Config {
   chainId: number;
@@ -28,11 +34,19 @@ interface L1Config {
   gasFaucetUrl?: string;
 }
 
-const l1Config: L1Config | undefined =
-  typeof window !== 'undefined' ? (window as { AGRO_L1?: L1Config }).AGRO_L1 : undefined;
+/** OrbiTag L1 (AvaCloud managed, Fuji-based). currencySymbol must match the L1's native gas token. */
+export const DEFAULT_L1: L1Config = {
+  chainId: 500301,
+  rpcUrl: '/rpc',
+  name: 'OrbiTag L1',
+  currencySymbol: 'AGRO',
+};
+
+const l1Config: L1Config =
+  (typeof window !== 'undefined' && (window as { AGRO_L1?: L1Config }).AGRO_L1) || DEFAULT_L1;
 
 const l1Chain: Chain | undefined =
-  l1Config?.chainId && l1Config.rpcUrl
+  l1Config.chainId && l1Config.rpcUrl
     ? defineChain({
         id: l1Config.chainId,
         name: l1Config.name ?? 'Avalanche L1',
@@ -41,7 +55,9 @@ const l1Chain: Chain | undefined =
           symbol: l1Config.currencySymbol ?? 'GAS',
           decimals: l1Config.currencyDecimals ?? 18,
         },
-        rpcUrls: { default: { http: [l1Config.rpcUrl] } },
+        rpcUrls: {
+          default: { http: [l1Config.rpcUrl.startsWith('/') ? `${apiBase}${l1Config.rpcUrl}` : l1Config.rpcUrl] },
+        },
         blockExplorers: l1Config.explorerUrl
           ? { default: { name: 'Explorer', url: l1Config.explorerUrl } }
           : undefined,
@@ -82,8 +98,7 @@ export const DEPLOYMENT: Deployment | undefined = DEPLOYMENTS[TARGET_CHAIN_ID];
 export const IS_LOCAL_CHAIN = TARGET_CHAIN_ID === 31337;
 export const IS_FUJI = TARGET_CHAIN_ID === 43113;
 
-export const API_URL =
-  (typeof window !== 'undefined' && (window as { AGRO_API_URL?: string }).AGRO_API_URL) || 'http://localhost:8000';
+export const API_URL = apiBase;
 
 export const EXPLORER_URL = IS_LOCAL_CHAIN
   ? null
@@ -95,7 +110,7 @@ export const AVAX_FAUCET_URL = 'https://core.app/tools/testnet-faucet/?subnet=c&
 /** Where to get native gas tokens on the active chain (null = not applicable / unknown). */
 export const GAS_FAUCET_URL: string | null = IS_FUJI
   ? AVAX_FAUCET_URL
-  : (l1Config?.gasFaucetUrl ?? null);
+  : (l1Config.gasFaucetUrl ?? null);
 
 export function txUrl(hash: string): string | null {
   return EXPLORER_URL ? `${EXPLORER_URL}/tx/${hash}` : null;

@@ -38,7 +38,11 @@ export class WalletService {
 
   readonly chain = TARGET_CHAIN;
   readonly deployment = DEPLOYMENT;
-  readonly publicClient = createPublicClient({ chain: TARGET_CHAIN, transport: http() });
+  // Batch concurrent reads into one JSON-RPC request (managed L1 RPCs are rate limited).
+  readonly publicClient = createPublicClient({
+    chain: TARGET_CHAIN,
+    transport: http(undefined, { batch: { batchSize: 50, wait: 20 }, retryCount: 4, retryDelay: 500 }),
+  });
 
   readonly hasProvider = signal(false);
   readonly account = signal<Address | null>(null);

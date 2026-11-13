@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>OrbiTag · MVP / testnet</title>
-  <meta name="description" content="Tokenización simulada de lotes agrícolas del norte argentino sobre Avalanche Fuji, con datos satelitales reales.">
+  <meta name="description" content="Tokenización simulada de lotes agrícolas del norte argentino sobre una Avalanche L1 propia (OrbiTag L1), con datos satelitales reales.">
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -11,14 +11,13 @@
 <body>
   <app-root></app-root>
   <script>
-    // Custom Avalanche L1 (AvaCloud managed node). Adjust name/currencySymbol
-    // to match your L1's gas token; add explorerUrl/gasFaucetUrl if available.
-    window.AGRO_L1 = {
-      chainId: 500301,
-      rpcUrl: 'https://managed-nodes.avax.network/ext/bc/25q34oCrUpLtwMWfnkCcfcKiH6ec84npvtSBy1bLGRyN4KiizF/rpc',
-      name: 'OrbiTag L1',
-      currencySymbol: 'AGRO',
-    };
+    // If the backend runs on a non-default port (e.g. the local docker stack holds
+    // :8000 and you run the L1 backend on :8001), point the API here:
+    // window.AGRO_API_URL = 'http://localhost:8001';
+    // The OrbiTag L1 (chainId 500301, RPC proxied through the backend's /rpc) is the
+    // default in src/app/core/config.ts (DEFAULT_L1), so SSR and the browser agree.
+    // Override only to target another L1 (add explorerUrl/gasFaucetUrl if available):
+    // window.AGRO_L1 = { chainId: 12345, rpcUrl: '/rpc', name: 'Mi L1', currencySymbol: 'GAS' };
   </script>
 </body>
 </html>

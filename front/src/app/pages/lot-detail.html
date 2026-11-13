@@ -194,7 +194,7 @@
               </div>
               <div class="text-right text-xs text-stone-400">
                 <p>{{ dateTime(e.timestamp) }}</p>
-                @if (txUrl(e.txHash); as url) { <a class="text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">Snowtrace ↗</a> }
+                @if (txUrl(e.txHash); as url) { <a class="text-emerald-700 underline" [href]="url" target="_blank" rel="noopener">Explorador ↗</a> }
                 @else { <span class="font-mono">bloque {{ e.blockNumber }}</span> }
               </div>
             </li>

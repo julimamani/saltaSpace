@@ -31,9 +31,9 @@ import { shortAddr } from '../core/format';
               </p>
               @if (t.hash) {
                 @if (t.url) {
-                  <a class="text-xs font-medium text-emerald-700 underline" [href]="t.url" target="_blank" rel="noopener">Ver en Snowtrace (testnet) ↗</a>
+                  <a class="text-xs font-medium text-emerald-700 underline" [href]="t.url" target="_blank" rel="noopener">Ver en el explorador ↗</a>
                 } @else {
-                  <p class="font-mono text-xs text-stone-400">tx {{ short(t.hash) }} (red local)</p>
+                  <p class="font-mono text-xs text-stone-400">tx {{ short(t.hash) }}</p>
                 }
               }
             </div>

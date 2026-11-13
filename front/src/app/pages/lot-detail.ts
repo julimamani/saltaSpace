@@ -238,7 +238,11 @@ export class LotDetail implements OnDestroy {
   constructor() {
     afterNextRender(() => {
       void this.loadAll();
-      this.timer = setInterval(() => void this.refresh(), 20_000);
+      // Managed L1 RPCs are rate limited: refresh slowly and only while the tab is visible.
+      this.timer = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        this.refresh().catch((e) => console.warn('Lot refresh failed', e));
+      }, 45_000);
     });
     effect(() => {
       this.wallet.account();

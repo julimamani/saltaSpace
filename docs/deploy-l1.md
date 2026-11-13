@@ -25,15 +25,23 @@ tener su propio gas token (no necesariamente AVAX) y corre `subnet-evm`.
    CHAIN_NETWORK=l1        # debe coincidir con el nombre del archivo de deployments
    RPC_URL=https://<rpc-de-tu-l1>
    ORACLE_PRIVATE_KEY=0x...    # wallet con ORACLE_ROLE, con gas token
-   EXPLORER_TX_URL=https://<tu-explorer>/tx/   # Snowtrace no indexa L1s custom
+   EXPLORER_TX_URL=https://<tu-explorer>/tx/   # opcional; vacío = sin links (Snowtrace no indexa L1s custom)
    ```
-4. **Front**: la L1 se define en runtime (mismo patrón que `AGRO_API_URL`). Agregá un
-   `<script>` inline en `front/src/index.html` antes de `</body>`:
+4. **Front**: la L1 por defecto es la OrbiTag L1 (chainId 500301), definida en
+   `DEFAULT_L1` de `front/src/app/core/config.ts`. Está en el código y no solo en
+   `window` para que el prerender SSR y el browser resuelvan la misma red. El RPC va
+   **proxied por el backend** (`POST /rpc` → `RPC_URL`): los RPC gestionados de AvaCloud
+   no envían headers CORS y el browser bloquea las llamadas de viem
+   ("Cross-Origin Request Blocked" / "HTTP request failed"). Además tienen rate limit
+   (HTTP 429): el front agrupa las lecturas en batches y el proxy cachea lecturas
+   ~3 s, limita la concurrencia y reintenta con backoff.
+   Para apuntar a otra L1, cambiá `DEFAULT_L1` o agregá un `<script>` inline en
+   `front/src/index.html` antes de `</body>` (solo aplica en el browser):
    ```html
    <script>
      window.AGRO_L1 = {
        chainId: 12345,                    // el chainId de tu L1
-       rpcUrl: 'https://<rpc-de-tu-l1>',
+       rpcUrl: '/rpc',                     // proxy del backend (evita el bloqueo CORS)
        name: 'Salta L1',
        currencySymbol: 'SALT',            // gas token de la L1
        explorerUrl: 'https://<tu-explorer>',   // opcional (Blockscout, etc.)
@@ -41,8 +49,8 @@ tener su propio gas token (no necesariamente AVAX) y corre `subnet-evm`.
      };
    </script>
    ```
-   Con eso la app resuelve la chain sola: si existe el deployment exportado y `AGRO_L1`
-   está configurado, la L1 pasa a ser la default (o forzala con `?chain=<chainId>`).
+   Con eso la app resuelve la chain sola: si existe el deployment exportado de esa L1,
+   pasa a ser la default (o forzala con `?chain=<chainId>`).
    El botón de la wallet agrega la red a MetaMask/Core vía `wallet_addEthereumChain`.
 
 ## Stablecoin en la L1

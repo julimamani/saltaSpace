@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     rpc_url: str = "http://127.0.0.1:8545"
     chain_network: str = "localhost"  # name of the file in app/chain/deployments/<name>.json
     oracle_private_key: str | None = None
-    explorer_tx_url: str = "https://testnet.snowtrace.io/tx/"
+    explorer_tx_url: str = ""  # empty: Snowtrace on fuji, no links elsewhere (custom L1s need their own explorer)
 
     # --- data sources
     stac_url: str = "https://earth-search.aws.element84.com/v1"

@@ -69,7 +69,7 @@ import { StatusBadge } from '../shared/status-badge';
           <a class="btn-ghost" [routerLink]="lot() ? ['/lots', lot()!.id] : ['/lots']">Invertir / liberar / repagar / liquidar en el detalle →</a>
         </div>
         @if (!local) {
-          <p class="mt-2 text-xs text-stone-500">En Fuji no se puede adelantar el tiempo: creá el lote con "plazos cortos para demo" o liquidá con una cuenta con SETTLER_ROLE.</p>
+          <p class="mt-2 text-xs text-stone-500">En una red pública (L1 o Fuji) no se puede adelantar el tiempo: creá el lote con "plazos cortos para demo" o liquidá con una cuenta con SETTLER_ROLE.</p>
         }
 
         <div class="mt-6 rounded-xl bg-stone-50 p-4 text-sm text-stone-600">

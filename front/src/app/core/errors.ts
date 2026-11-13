@@ -1,4 +1,23 @@
-import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError } from 'viem';
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  HttpRequestError,
+  LimitExceededRpcError,
+  UserRejectedRequestError,
+} from 'viem';
+
+export const RATE_LIMIT_MESSAGE =
+  'La red está saturada (límite de peticiones del RPC). Esperá unos segundos y reintentá.';
+const RATE_LIMIT_RE = /rate limit|too many requests|status: 429/i;
+
+/** RPC rate limit (HTTP 429), whether it came through viem or from the wallet (MetaMask: -32603 "Request is being rate limited."). */
+export function isRateLimited(e: unknown): boolean {
+  const matches = (x: unknown) =>
+    x instanceof LimitExceededRpcError ||
+    (x instanceof HttpRequestError && x.status === 429) ||
+    (!!x && typeof x === 'object' && 'message' in x && RATE_LIMIT_RE.test(String(x.message)));
+  return e instanceof BaseError ? !!e.walk(matches) : matches(e);
+}
 
 const FRIENDLY: Record<string, string> = {
   FundingClosed: 'La campaña ya cerró.',
@@ -22,6 +41,7 @@ const FRIENDLY: Record<string, string> = {
 export function errorMessage(e: unknown): string {
   if (e instanceof BaseError) {
     if (e.walk((x) => x instanceof UserRejectedRequestError)) return 'Rechazaste la transacción en la wallet.';
+    if (isRateLimited(e)) return RATE_LIMIT_MESSAGE;
     const revert = e.walk((x) => x instanceof ContractFunctionRevertedError);
     if (revert instanceof ContractFunctionRevertedError) {
       const name = revert.data?.errorName;
@@ -33,6 +53,7 @@ export function errorMessage(e: unknown): string {
     }
     return e.shortMessage;
   }
+  if (isRateLimited(e)) return RATE_LIMIT_MESSAGE;
   if (e && typeof e === 'object' && 'message' in e) return String((e as { message: unknown }).message);
   return String(e);
 }

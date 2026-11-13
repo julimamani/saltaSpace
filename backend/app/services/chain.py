@@ -19,6 +19,7 @@ from ..config import APP_DIR, Settings
 log = logging.getLogger(__name__)
 CHAIN_DIR = APP_DIR / "chain"
 STATUS = ["Funding", "Funded", "Failed", "Settled"]
+FUJI_EXPLORER_TX_URL = "https://testnet.snowtrace.io/tx/"
 
 
 def _abi(name: str) -> list[dict[str, Any]]:
@@ -195,4 +196,5 @@ class Chain:
         return {"tx_hash": "0x" + tx_hash.hex().removeprefix("0x"), "block_number": receipt["blockNumber"], "timestamp": ts}
 
     def explorer_url(self, tx_hash: str) -> str | None:
-        return f"{self.s.explorer_tx_url}{tx_hash}" if self.s.chain_network == "fuji" else None
+        base = self.s.explorer_tx_url or (FUJI_EXPLORER_TX_URL if self.s.chain_network == "fuji" else "")
+        return f"{base}{tx_hash}" if base else None

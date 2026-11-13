@@ -131,7 +131,7 @@ export class Nosotros {
   ];
 
   protected readonly tech = [
-    { title: 'Blockchain · Avalanche', items: ['Contratos Solidity en C‑Chain (Fuji testnet)', 'Un token ERC‑20 por lote (clones EIP‑1167)', 'CampaignVault: inversión, repago, liquidación y seguro paramétrico', 'OpenZeppelin: ReentrancyGuard, Pausable, SafeERC20, roles'] },
+    { title: 'Blockchain · Avalanche', items: ['Contratos Solidity en una Avalanche L1 propia (OrbiTag L1, testnet)', 'Un token ERC‑20 por lote (clones EIP‑1167)', 'CampaignVault: inversión, repago, liquidación y seguro paramétrico', 'OpenZeppelin: ReentrancyGuard, Pausable, SafeERC20, roles'] },
     { title: 'Satélites', items: ['Sentinel‑2 (Earth Search): NDVI, EVI, NDWI y LAI semanales', 'Sentinel‑1 radar (Planetary Computer): VV/VH, atraviesa nubes', 'Si Sentinel‑2 tiene > 20% de nubes, manda el radar'] },
     { title: 'Clima y agua', items: ['Open‑Meteo y NASA POWER (diario + histórico 2001‑2025)', 'ET0 FAO‑56 Penman‑Monteith', 'ETc = ET0 × Kc por cultivo y balance hídrico en floración'] },
     { title: 'Oráculo', items: ['Backend Python / FastAPI', 'Publica métricas firmadas con ORACLE_ROLE', 'dataHash ancla los datos usados en cada publicación'] },

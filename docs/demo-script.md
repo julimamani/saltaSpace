@@ -1,6 +1,6 @@
 # Guion de demo (3 minutos)
 
-Preparación: `docker compose up --build`, wallet (Core/MetaMask) con la red local `http://localhost:8545` (chainId 31337) e importada la cuenta de Hardhat #0 (ver README). Abrir http://localhost:4000.
+Preparación (OrbiTag L1, chainId 500301): `ORACLE_PRIVATE_KEY` en `.env` y `docker compose up -d --build`. Abrir http://localhost:4000 y, desde el botón de la wallet (Core/MetaMask), agregar la red OrbiTag L1; la wallet necesita gas token de la L1. Para la demo local con Hardhat (chainId 31337) ver la sección "Red local" del README (`docker compose --profile local up -d --build`, cuenta Hardhat #0 y `?chain=31337`).
 
 | Tiempo | Acción | Qué decir |
 |---|---|---|
@@ -15,4 +15,4 @@ Preparación: `docker compose up --build`, wallet (Core/MetaMask) con la red loc
 | 2:30 | Detalle → **Depositar repago** → **Liquidar** → **Cobrar**. | "En la cosecha, el contrato fija el pago con los datos del oráculo y cada inversor cobra quemando sus tokens." |
 | 2:50 | Cierre: limitaciones. | "Para producción: marco CNV, KYC, oráculos descentralizados (Chainlink Functions) y auditoría." |
 
-En Fuji los links de cada transacción abren Snowtrace testnet.
+Los links de cada transacción abren el explorador de la red si hay uno configurado (Snowtrace en Fuji, `explorerUrl` / `EXPLORER_TX_URL` en la L1); si no, se muestra el hash.

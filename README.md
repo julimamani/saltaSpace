@@ -1,6 +1,6 @@
 # OrbiTag · saltaSpace
 
-> **Prototipo MVP.** Los lotes y tokens son **simulados**; no hay tokenización legal, oferta pública ni valor real. Solo Avalanche Fuji / red local.
+> **Prototipo MVP.** Los lotes y tokens son **simulados**; no hay tokenización legal, oferta pública ni valor real. Solo testnet: Avalanche L1 propia (OrbiTag L1, chainId 500301), Fuji o red local.
 
 OrbiTag es un prototipo de hackathon (48 h) de tokenización B2B de activos agrícolas (RWA) del norte argentino sobre **Avalanche**. El activo es simulado, pero su comportamiento financiero depende de **datos reales**: NDVI de Sentinel‑2 y clima de Open‑Meteo / NASA POWER.
 
@@ -30,7 +30,7 @@ flowchart LR
     OM[Open-Meteo]
     NP[NASA POWER + climatología]
   end
-  subgraph Chain["Avalanche Fuji C-Chain (43113) / Hardhat (31337)"]
+  subgraph Chain["OrbiTag Avalanche L1 (500301) / Fuji (43113) / Hardhat (31337)"]
     F[LotFactory] -->|clona| T[LotToken ERC-20 por lote]
     V[CampaignVault] --> F
     V --> O[OracleConsumer]
@@ -95,13 +95,26 @@ Docs interactivas en http://localhost:8000/docs.
 - Docker + Docker Compose (opcional, para levantar todo con un comando).
 - Wallet [Core](https://core.app/) o MetaMask.
 
-## Correr todo con un comando (red local)
+## Correr todo con un comando (OrbiTag L1)
 
 ```bash
-docker compose up --build
+# .env en la raíz (o backend/.env): ORACLE_PRIVATE_KEY=<wallet con ORACLE_ROLE en la L1>
+docker compose up -d --build
 ```
 
-- Front: http://localhost:4000 · API: http://localhost:8000/docs · RPC Hardhat: http://localhost:8545 (chainId 31337)
+- Front: http://localhost:4000 · API: http://localhost:8000/docs · RPC: proxy del backend en `http://localhost:8000/rpc` → RPC gestionado de AvaCloud (chainId 500301).
+- Usa los contratos ya desplegados en `contracts/deployments/l1.json`; el oráculo publica al arrancar y cada 30 min.
+- El RPC gestionado tiene rate limit (HTTP 429): el front agrupa lecturas en batches y el proxy `/rpc` cachea ~3 s, limita la concurrencia y reintenta con backoff.
+- La wallet necesita gas token de la L1; el botón de la wallet agrega la red a Core/MetaMask.
+
+### Red local (Hardhat)
+
+```bash
+RPC_URL=http://hardhat:8545 CHAIN_NETWORK=localhost ORACLE_PRIVATE_KEY=<clave Hardhat #0> \
+  docker compose --profile local up -d --build
+```
+
+- Abrí el front con `http://localhost:4000/?chain=31337`. RPC Hardhat: http://localhost:8545 (chainId 31337).
 - Se despliegan los contratos, se crean 2 lotes de ejemplo (Porotos en Rosario de la Frontera y Maíz en Valle de Lerma), se siembra el pool de seguro con 2.000 USDC y el oráculo publica datos reales al arrancar y cada 30 min.
 - En la wallet agregá la red `http://localhost:8545`, chainId `31337`, e importá la cuenta de Hardhat **#0** (`0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`). Es una clave de desarrollo **pública**: tiene ETH local, es el admin (`SETTLER_ROLE`, puede liquidar antes de la madurez) y el productor de los lotes de ejemplo. Nunca la uses en otra red.
 - Si reiniciás el nodo Hardhat, reseteá la actividad de la cuenta en la wallet (nonce).
@@ -136,7 +149,7 @@ npm start                     # http://localhost:4200
 
 | Variable | Uso |
 |---|---|
-| `DEPLOYER_PRIVATE_KEY` | Wallet que despliega en Fuji (necesita AVAX de test). **Nunca la commitees.** |
+| `DEPLOYER_PRIVATE_KEY` | Wallet que despliega (necesita gas: el token nativo de la L1, o AVAX de test en Fuji). **Nunca la commitees.** |
 | `ORACLE_ADDRESS` | Dirección que recibe `ORACLE_ROLE` (la del backend). Por defecto, el deployer. |
 | `COMPLIANCE_ADDRESS` | Dirección que recibe `COMPLIANCE_ROLE` (verifica inversores / KYC). Por defecto, el deployer. |
 | `FUJI_RPC_URL` | Default `https://api.avax-test.network/ext/bc/C/rpc`. |
@@ -159,7 +172,7 @@ npm start                     # http://localhost:4200
 | `ENABLE_SCHEDULER`, `ORACLE_INTERVAL_MINUTES` | `true`, `30` | Publicación periódica. |
 | `CORS_ORIGINS` | localhost:4200/4000 | Orígenes permitidos. |
 
-**Front**: la red se elige sola (Fuji si existe `deployments` de Fuji exportado; si no, local). Se puede forzar con `?chain=31337` o `?chain=43113`. La URL del backend es `http://localhost:8000` (override con `window.AGRO_API_URL`).
+**Front**: la red se elige sola: Fuji si existe `deployments` de Fuji exportado; si no, la OrbiTag L1 (`DEFAULT_L1` en `front/src/app/core/config.ts`); si no, local. Se puede forzar con `?chain=500301`, `?chain=31337` o `?chain=43113`. La URL del backend es `http://localhost:8000` (override con `window.AGRO_API_URL`).
 
 ## Deploy en Avalanche Fuji
 
@@ -177,7 +190,7 @@ Detalle en [docs/deploy-fuji.md](docs/deploy-fuji.md).
 1. Creá la L1 (Avalanche CLI / Builder Hub) y anotá `chainId`, RPC y el símbolo del gas token.
 2. `contracts/.env`: `L1_RPC_URL`, `L1_CHAIN_ID` y `DEPLOYER_PRIVATE_KEY` → `npm run deploy:l1` (y `seed:l1` opcional). Si la L1 corre un EVM viejo, `EVM_VERSION=shanghai`.
 3. `backend/.env`: `CHAIN_NETWORK=l1`, `RPC_URL=<rpc l1>`, `ORACLE_PRIVATE_KEY`, `EXPLORER_TX_URL`.
-4. `front/src/index.html`: un `<script>` con `window.AGRO_L1 = {chainId, rpcUrl, name, currencySymbol, explorerUrl, gasFaucetUrl}`.
+4. Front: `DEFAULT_L1` en `front/src/app/core/config.ts` (`{chainId, rpcUrl, name, currencySymbol, explorerUrl, gasFaucetUrl}`; la OrbiTag L1 ya está configurada). También se puede sobreescribir en el browser con `window.AGRO_L1` en `index.html`.
 5. **Stablecoin real**: `USDC_ADDRESS=<erc20>` en el deploy usa ese token en vez de `MockUSDC` (el `CampaignVault` toma cualquier `IERC20` de 6 decimales; el front oculta el faucet). Para USDC nativo de C-Chain, bridjealo con ICTT/Teleporter.
 
 Detalle en [docs/deploy-l1.md](docs/deploy-l1.md).

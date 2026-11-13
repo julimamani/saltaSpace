@@ -1,5 +1,5 @@
 <div class="disclaimer" role="note">
-  <strong>OrbiTag- MVP / testnet</strong> — Activos agrícolas simulados en {{ chainName }}. Sin valor real; no constituye oferta pública ni tokenización legal.
+  <strong>OrbiTag · MVP / testnet</strong> — Activos agrícolas simulados en {{ chainName }}. Sin valor real; no constituye oferta pública ni tokenización legal.
 </div>
 
 <header class="sticky top-0 z-[1200] border-b border-stone-200/80 bg-white/90 backdrop-blur">
@@ -29,14 +29,14 @@
 
 <main class="mx-auto max-w-7xl px-4 py-8">
   @if (!deployed) {
-    <div class="alert-error mb-6">No hay contratos desplegados para {{ chainName }}. Corré <code>npm run deploy:local</code> o <code>deploy:fuji</code> en <code>contracts/</code>.</div>
+    <div class="alert-error mb-6">No hay contratos desplegados para {{ chainName }}. Corré <code>npm run deploy:l1</code> (o <code>deploy:local</code>) en <code>contracts/</code>.</div>
   }
   <router-outlet />
 </main>
 
 <footer class="border-t border-stone-200 bg-white/60">
   <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-stone-500">
-    <p>OrbiTag · Hackathon prototype · Avalanche Fuji · Datos: Sentinel‑2 (Earth Search), Open‑Meteo, NASA POWER.</p>
+    <p>OrbiTag · Hackathon prototype · {{ chainName }} · Datos: Sentinel‑2 (Earth Search), Open‑Meteo, NASA POWER.</p>
     <p class="font-semibold text-amber-700">Prototipo MVP — no es asesoramiento financiero.</p>
   </div>
 </footer>
