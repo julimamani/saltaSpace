@@ -274,3 +274,39 @@ export interface HealthResponse {
   force_mock_ndvi: boolean;
   chain: { connected: boolean; chain_id?: number; network?: string; oracle_configured?: boolean; error?: string };
 }
+
+export interface RiskFactor {
+  clave: string;
+  etiqueta: string;
+  porcentaje: number;
+  contribucion?: number | null;
+  efecto?: 'sube' | 'baja' | null;
+}
+
+export interface DroughtFeatures {
+  precipitacion_7d_acumulada: number;
+  precipitacion_15d_acumulada: number;
+  temp_max_promedio: number;
+  radiacion_solar: number;
+  ET0_fao: number;
+  NDVI_actual: number;
+  NDWI_actual: number;
+  radar_soil_moisture: number;
+  dia_del_anio: number;
+  etapa_floracion: boolean;
+}
+
+export interface DroughtPrediction {
+  probabilidad_sequia: number;
+  riesgo: 'BAJO' | 'MEDIO' | 'ALTO';
+  horizonte_dias: number;
+  factores: RiskFactor[];
+  importancia_global: RiskFactor[];
+  features: Record<string, number>;
+  modelo: { version: string; trained_at: string; dataset: string; metrics: { auc: number | null; accuracy: number } };
+  timestamp: string;
+  aviso: string;
+  lot_id: number | null;
+  fuente: string;
+  analisis_fecha: string | null;
+}

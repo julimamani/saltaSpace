@@ -8,10 +8,11 @@ import { WalletService } from '../core/wallet.service';
 import { ApiService, apiError } from '../core/api.service';
 import { errorMessage } from '../core/errors';
 import { USDC_DECIMALS, addressUrl, txUrl } from '../core/config';
-import type { InsuranceParams, LotEvent, LotMetricsResponse, LotView, PayoutParams } from '../core/models';
+import type { DroughtPrediction, InsuranceParams, LotEvent, LotMetricsResponse, LotView, PayoutParams } from '../core/models';
 import { dateTime, duration, pct, riskLabel, shortAddr, shortDate, usd } from '../core/format';
 import { LotMap } from '../shared/lot-map';
 import { LineChart, type ChartSeries } from '../shared/line-chart';
+import { RiskChart } from '../shared/risk-chart';
 import { StatusBadge } from '../shared/status-badge';
 import { CampaignVaultAbi } from '../web3/generated/abis';
 
@@ -57,7 +58,7 @@ type OnchainMetricsArgs = {
 
 @Component({
   selector: 'app-lot-detail',
-  imports: [FormsModule, KeyValuePipe, RouterLink, LotMap, LineChart, StatusBadge],
+  imports: [FormsModule, KeyValuePipe, RouterLink, LotMap, LineChart, RiskChart, StatusBadge],
   templateUrl: './lot-detail.html',
 })
 export class LotDetail implements OnDestroy {
@@ -120,6 +121,8 @@ export class LotDetail implements OnDestroy {
     return p.tokens * perToken;
   });
 
+  protected readonly prediction = signal<DroughtPrediction | null>(null);
+  protected readonly predictionError = signal<string | null>(null);
   protected readonly analysis = computed(() => this.metrics()?.latest_analysis ?? null);
   protected readonly insurance = computed(() => this.analysis()?.insurance ?? null);
   protected readonly riskLevelCls = (lvl: string | undefined) =>
@@ -302,11 +305,23 @@ export class LotDetail implements OnDestroy {
       (m) => { this.metrics.set(m); this.metricsError.set(null); },
       (e) => this.metricsError.set(apiError(e)),
     );
+    void this.loadPrediction();
     this.lotsSvc.events(id).then(
       (ev) => { this.events.set(ev); this.eventsError.set(null); },
       (e) => this.eventsError.set(errorMessage(e)),
     );
     await this.loadPosition();
+  }
+
+  async loadPrediction(refresh = false): Promise<void> {
+    if (refresh) this.prediction.set(null);
+    this.predictionError.set(null);
+    try {
+      this.prediction.set(await this.api.prediction(Number(this.id()), refresh));
+    } catch (e) {
+      this.prediction.set(null);
+      this.predictionError.set(`Predicción no disponible: ${apiError(e)}`);
+    }
   }
 
   private async loadPosition(): Promise<void> {

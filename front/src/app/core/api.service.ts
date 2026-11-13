@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_URL } from './config';
-import type { AnalysisResult, HealthResponse, LotInsuranceResponse, LotMetricsResponse, PolygonGeometry, PushResult, Scenario } from './models';
+import type { AnalysisResult, DroughtFeatures, DroughtPrediction, HealthResponse, LotInsuranceResponse, LotMetricsResponse, PolygonGeometry, PushResult, Scenario } from './models';
 
 export interface AnalyzeOptions {
   startDate?: string;
@@ -32,6 +32,15 @@ export class ApiService {
         harvest_date: o.harvestDate,
       }),
     );
+  }
+
+  /** XGBoost drought probability (next 15 days) from the oracle's last analysis of a lot. */
+  prediction(lotId: number, refresh = false): Promise<DroughtPrediction> {
+    return firstValueFrom(this.http.get<DroughtPrediction>(`${API_URL}/lots/${lotId}/prediccion`, { params: { refresh } }));
+  }
+
+  predictDrought(features: DroughtFeatures): Promise<DroughtPrediction> {
+    return firstValueFrom(this.http.post<DroughtPrediction>(`${API_URL}/predict/sequia`, features));
   }
 
   insurance(lotId: number, refresh = false): Promise<LotInsuranceResponse> {

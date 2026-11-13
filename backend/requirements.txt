@@ -7,3 +7,9 @@ rasterio==1.4.*
 numpy==2.1.*
 web3==7.6.*
 apscheduler==3.10.*
+# xgboost-cpu: same `import xgboost`, without the ~340 MB CUDA/NCCL wheel on Linux x86_64.
+xgboost-cpu==2.1.*; sys_platform == "linux" and platform_machine == "x86_64"
+xgboost==2.1.*; sys_platform != "linux" or platform_machine != "x86_64"
+pandas==2.2.*
+scikit-learn==1.5.*
+joblib==1.4.*

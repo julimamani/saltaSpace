@@ -1,19 +1,33 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LotsService } from '../core/lots.service';
-import { ApiService } from '../core/api.service';
+import { ApiService, apiError } from '../core/api.service';
 import { WalletService } from '../core/wallet.service';
 import { errorMessage } from '../core/errors';
-import type { HealthResponse, LotView } from '../core/models';
+import type { DroughtFeatures, DroughtPrediction, HealthResponse, LotView } from '../core/models';
 import { pct, usd } from '../core/format';
 import { LotCard } from '../shared/lot-card';
+import { RiskChart } from '../shared/risk-chart';
 
 type Audience = 'inversor' | 'productor';
 type Scenario = 'drought' | 'normal' | 'excellent';
 
+const DEMO_FEATURES: DroughtFeatures = {
+  precipitacion_7d_acumulada: 0,
+  precipitacion_15d_acumulada: 4,
+  temp_max_promedio: 34,
+  radiacion_solar: 25,
+  ET0_fao: 6.2,
+  NDVI_actual: 0.42,
+  NDWI_actual: -0.05,
+  radar_soil_moisture: 0.08,
+  dia_del_anio: 45,
+  etapa_floracion: true,
+};
+
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, LotCard],
+  imports: [RouterLink, LotCard, RiskChart],
   template: `
     <section class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-700 px-6 py-12 text-white sm:px-10">
       <div class="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-lime-400/20 blur-3xl"></div>
@@ -135,6 +149,34 @@ type Scenario = 'drought' | 'normal' | 'excellent';
       }
     </section>
 
+    <section class="mt-10 card" aria-labelledby="pred-title">
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">De reactivo a predictivo · XGBoost</p>
+          <h2 id="pred-title" class="text-2xl font-bold text-stone-900">Riesgo de sequía en los próximos 15 días</h2>
+          <p class="mt-1 max-w-2xl text-sm text-stone-600">Un modelo de gradient boosting lee la lluvia, la temperatura, el ET0 Penman‑Monteith, el NDVI/NDWI de Sentinel‑2 y la humedad de suelo del radar Sentinel‑1, y anticipa el estrés hídrico antes de que ocurra.</p>
+        </div>
+        <label class="text-sm text-stone-600">
+          <span class="mr-2">Lote</span>
+          <select class="input w-auto" [value]="predLot()" (change)="selectPredLot($any($event.target).value)" aria-label="Lote para la predicción">
+            @for (l of lots(); track l.id) { <option [value]="l.id">#{{ l.id }} · {{ l.name }}</option> }
+            <option value="demo">Ejemplo: lote en floración sin lluvia</option>
+          </select>
+        </label>
+      </div>
+      @if (predLoading()) {
+        <div class="h-60 animate-pulse rounded-2xl bg-stone-100"></div>
+      } @else if (predError()) {
+        <div class="rounded-xl border border-dashed border-stone-300 p-6 text-center text-sm text-stone-500">
+          {{ predError() }}
+          <button type="button" class="ml-2 font-semibold text-emerald-700 underline" (click)="selectPredLot('demo')">Ver el ejemplo</button>
+        </div>
+      } @else {
+        <app-risk-chart [prediction]="prediction()" />
+      }
+      <p class="mt-4 text-[11px] text-stone-400">Predicción orientativa de un modelo educativo entrenado con datos simulados: no modifica el seguro paramétrico on-chain ni es una promesa de rendimiento.</p>
+    </section>
+
     <section class="mt-12">
       <h2 class="mb-4 text-2xl font-bold text-stone-900">Cómo funciona</h2>
       <ol class="grid gap-4 md:grid-cols-4">
@@ -215,6 +257,11 @@ export class Dashboard {
     { t: 'Liquidación por datos', d: 'El contrato calcula el pago con datos del oráculo.', more: 'El oráculo publica NDVI/NDWI, balance hídrico y radar; si hay sequía, el seguro paga automáticamente y luego cada inversor cobra quemando sus tokens.' },
   ];
 
+  protected readonly predLot = signal<string>('demo');
+  protected readonly prediction = signal<DroughtPrediction | null>(null);
+  protected readonly predLoading = signal(true);
+  protected readonly predError = signal<string | null>(null);
+
   protected readonly audience = signal<Audience>('inversor');
   protected readonly amount = signal(1000);
   protected readonly scenario = signal<Scenario>('normal');
@@ -246,6 +293,22 @@ export class Dashboard {
       this.error.set(errorMessage(e));
     } finally {
       this.loading.set(false);
+    }
+    const active = this.lots().find((l) => l.status === 'Funded' || l.status === 'Funding') ?? this.lots()[0];
+    void this.selectPredLot(active ? String(active.id) : 'demo');
+  }
+
+  protected async selectPredLot(id: string): Promise<void> {
+    this.predLot.set(id);
+    this.predLoading.set(true);
+    this.predError.set(null);
+    try {
+      this.prediction.set(id === 'demo' ? await this.api.predictDrought(DEMO_FEATURES) : await this.api.prediction(Number(id)));
+    } catch (e) {
+      this.prediction.set(null);
+      this.predError.set(`No hay predicción disponible para este lote: ${apiError(e)}`);
+    } finally {
+      this.predLoading.set(false);
     }
   }
 }

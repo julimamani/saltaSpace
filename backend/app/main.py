@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .deps import get_chain, get_settings, get_store
 from .logging_setup import setup_logging
-from .routers import demo, lots, oracle
+from .routers import demo, lots, oracle, predict
 from .services.chain import Chain
 from .services.oracle import push_active_lots
 
@@ -53,6 +53,7 @@ app.add_middleware(
 app.include_router(lots.router)
 app.include_router(oracle.router)
 app.include_router(demo.router)
+app.include_router(predict.router)
 
 
 @app.get("/health", tags=["health"])
